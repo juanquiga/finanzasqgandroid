@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/finanzas_card_top"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- Título -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Recuperar contraseña"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Subtexto -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Ingresa tu correo para enviarte un enlace"
+        android:textColor="#445566"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:layout_marginBottom="20dp"/>
+
+    <!-- Label -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CORREO ELECTRÓNICO"
+        android:textColor="#4CAF50"
+        android:textSize="11sp"
+        android:layout_marginBottom="6dp"/>
+
+    <!-- Input -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="54dp"
+        android:background="@drawable/finanzas_input_bg"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✉"
+            android:textColor="#4CAF50"
+            android:textSize="18sp"
+            android:layout_marginEnd="12dp"/>
+
+        <EditText
+            android:id="@+id/etEmailRecuperar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@null"
+            android:hint="tu@email.com"
+            android:inputType="textEmailAddress"
+            android:textColor="#EEFFEE"
+            android:textColorHint="#334455"/>
+    </LinearLayout>
+
+    <!-- Botón enviar -->
+    <Button
+        android:id="@+id/btnEnviarRecuperar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@drawable/finanzas_btn_green"
+        android:text="ENVIAR ENLACE"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginBottom="10dp"/>
+
+    <!-- Botón cancelar -->
+    <Button
+        android:id="@+id/btnCancelarRecuperar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:backgroundTint="#0D1A2A"
+        android:text="Cancelar"
+        android:textColor="#4CAF50"
+        android:textStyle="bold"/>
+
+</LinearLayout>

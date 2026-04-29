@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:background="@drawable/finanzas_card_background"
+    android:paddingStart="12dp" android:paddingEnd="8dp"
+    android:paddingTop="12dp" android:paddingBottom="12dp"
+    android:layout_marginBottom="6dp"
+    android:gravity="center_vertical">
+
+    <!-- Emoji tipo -->
+    <TextView android:id="@+id/tvTipoIndicador"
+        android:layout_width="36dp" android:layout_height="36dp"
+        android:gravity="center" android:text="📉"
+        android:textSize="16sp" android:layout_marginEnd="10dp"/>
+
+    <!-- Info -->
+    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:orientation="vertical">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/tvCategoria"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Categoría" android:textColor="#EEFFEE"
+                android:textSize="14sp" android:textStyle="bold"
+                android:ellipsize="end" android:maxLines="1"/>
+            <TextView android:id="@+id/tvValor"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="$0" android:textColor="#FF5252"
+                android:textSize="14sp" android:textStyle="bold"
+                android:layout_marginStart="8dp"/>
+        </LinearLayout>
+
+        <TextView android:id="@+id/tvDetalle"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="" android:textColor="#445566"
+            android:textSize="12sp" android:ellipsize="end" android:maxLines="1"
+            android:layout_marginTop="2dp"/>
+
+        <TextView android:id="@+id/tvFecha"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="" android:textColor="#334455"
+            android:textSize="11sp" android:layout_marginTop="2dp"/>
+    </LinearLayout>
+
+    <!-- Botón eliminar -->
+    <Button android:id="@+id/btnEliminarMovimiento"
+        android:layout_width="32dp" android:layout_height="32dp"
+        android:text="🗑" android:textSize="13sp"
+        android:padding="0dp"
+
+        android:background="@null"
+        android:layout_marginStart="6dp"/>
+
+</LinearLayout>

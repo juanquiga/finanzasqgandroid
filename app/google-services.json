@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "1038967366245",
+    "firebase_url": "https://finanzasqg-jdqg-default-rtdb.firebaseio.com",
+    "project_id": "finanzasqg-jdqg",
+    "storage_bucket": "finanzasqg-jdqg.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1038967366245:android:f1455bc6697a5a21341c8c",
+        "android_client_info": {
+          "package_name": "com.jdqg.finanzasqg"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1038967366245-tjssck3297ni2feq60cd15uq28vpagn5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jdqg.finanzasqg",
+            "certificate_hash": "799dadce8125ffb4c6c4f35d60c8c4d30163aceb"
+          }
+        },
+        {
+          "client_id": "1038967366245-9rdftjv1t163cltchjdivp83eoejjhqu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOuztM0Iv7SKXesaoUtG7knXrJvvc87r4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1038967366245-9rdftjv1t163cltchjdivp83eoejjhqu.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1038967366245-u7dqm2iar0o645rfpr9185osbgmb17s0.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.jdqg.finanzasqgios"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

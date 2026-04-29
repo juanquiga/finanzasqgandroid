@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_game_background"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="28dp"
+    android:paddingBottom="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="👤"
+        android:textSize="40sp"
+        android:gravity="center"
+        android:layout_marginBottom="10dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Cambiar usuario"
+        android:textColor="#4CAF50"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="6dp" />
+
+    <View
+        android:layout_width="50dp"
+        android:layout_height="3dp"
+        android:background="@drawable/divider_cyan"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="20dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="NUEVO NOMBRE"
+        android:textColor="#4CAF50"
+        android:textSize="11sp"
+        android:letterSpacing="0.12"
+        android:layout_marginBottom="8dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@drawable/finanzas_input_bg"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:layout_marginBottom="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✏️"
+            android:textSize="16sp"
+            android:layout_marginEnd="10dp" />
+
+        <EditText
+            android:id="@+id/etNuevoNombre"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@null"
+            android:hint="Tu nombre"
+            android:textColorHint="#334455"
+            android:inputType="textCapWords"
+            android:textSize="15sp"
+            android:textColor="#EEFFEE" />
+
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnGuardarNombre"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:text="GUARDAR"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:background="@drawable/finanzas_btn_green"
+        android:layout_marginBottom="10dp" />
+
+    <Button
+        android:id="@+id/btnCancelarNombre"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="Cancelar"
+        android:textColor="#445566"
+        android:textSize="14sp"
+        android:backgroundTint="#0D1A2A" />
+
+</LinearLayout>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/dialog_game_background"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="28dp"
+    android:paddingBottom="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📄 Términos y Condiciones"
+        android:textColor="#4CAF50"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="• Tus datos se guardan de forma segura en Firebase\n\n• No compartimos tu información personal con terceros\n\n• El uso de la app es bajo tu responsabilidad\n\n• FinanzasQG es una herramienta educativa y financiera personal\n\n• Puedes eliminar tu cuenta y datos en cualquier momento\n\nVersión 1.0 — 2025"
+        android:textColor="#9999BB"
+        android:textSize="13sp"
+        android:lineSpacingExtra="4dp"
+        android:layout_marginBottom="24dp" />
+
+    <Button
+        android:id="@+id/btnAceptarTerminos"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:text="ENTENDIDO"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:background="@drawable/finanzas_btn_green" />
+
+</LinearLayout>

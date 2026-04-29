@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A1628">
+
+    <!-- Header -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:background="@drawable/finanzas_card_background"
+        android:padding="16dp" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp" android:layout_marginBottom="10dp">
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical"
+            android:layout_marginBottom="14dp">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="FinanzasQG 💰" android:textColor="#4CAF50"
+                    android:textSize="20sp" android:textStyle="bold" />
+                <TextView android:id="@+id/tvSaludoResumen"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="Hola, usuario" android:textColor="#445566"
+                    android:textSize="13sp" android:layout_marginTop="2dp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Período -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="8dp">
+            <Button android:id="@+id/btnDiario" android:layout_width="0dp" android:layout_height="34dp"
+                android:layout_weight="1" android:text="Diario" android:textSize="12sp"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/btnMensual" android:layout_width="0dp" android:layout_height="34dp"
+                android:layout_weight="1" android:text="Mensual" android:textSize="12sp"
+                android:textColor="#050510" android:backgroundTint="#4CAF50" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/btnAnual" android:layout_width="0dp" android:layout_height="34dp"
+                android:layout_weight="1" android:text="Anual" android:textSize="12sp"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A" />
+        </LinearLayout>
+
+        <!-- Filtro tipo -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="8dp">
+            <Button android:id="@+id/btnFiltroTodo" android:layout_width="0dp" android:layout_height="32dp"
+                android:layout_weight="1" android:text="Todo" android:textSize="11sp"
+                android:textColor="#050510" android:backgroundTint="#4CAF50" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/btnFiltroIngreso" android:layout_width="0dp" android:layout_height="32dp"
+                android:layout_weight="1" android:text="Ingresos" android:textSize="11sp"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/btnFiltroEgreso" android:layout_width="0dp" android:layout_height="32dp"
+                android:layout_weight="1" android:text="Egresos" android:textSize="11sp"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/btnFiltroTransferencia" android:layout_width="0dp" android:layout_height="32dp"
+                android:layout_weight="1" android:text="Transfer" android:textSize="10sp"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A" />
+        </LinearLayout>
+
+        <!-- Filtro moneda -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Button android:id="@+id/btnMonedaTodas" android:layout_width="0dp" android:layout_height="32dp"
+                android:layout_weight="1" android:text="🌐 Ambas" android:textSize="11sp"
+                android:textColor="#050510" android:backgroundTint="#4CAF50" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/btnMonedaCOP" android:layout_width="0dp" android:layout_height="32dp"
+                android:layout_weight="1" android:text="🇨🇴 COP" android:textSize="11sp"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A" android:layout_marginEnd="4dp" />
+            <Button android:id="@+id/btnMonedaUSD" android:layout_width="0dp" android:layout_height="32dp"
+                android:layout_weight="1" android:text="🇺🇸 USD" android:textSize="11sp"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Cards ingresos/egresos -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:paddingStart="16dp" android:paddingEnd="16dp"
+        android:layout_marginBottom="8dp">
+        <LinearLayout android:id="@+id/cardIngresos"
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical"
+            android:background="@drawable/finanzas_card_background"
+            android:padding="14dp" android:layout_marginEnd="6dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="📈 Ingresos" android:textColor="#4CAF50" android:textSize="12sp" android:textStyle="bold" />
+            <TextView android:id="@+id/tvTotalIngresos"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="$0" android:textColor="#69F0AE" android:textSize="16sp"
+                android:textStyle="bold" android:layout_marginTop="6dp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/cardEgresos"
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical"
+            android:background="@drawable/finanzas_card_background"
+            android:padding="14dp" android:layout_marginStart="6dp">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="📉 Egresos" android:textColor="#FF5252" android:textSize="12sp" android:textStyle="bold" />
+            <TextView android:id="@+id/tvTotalEgresos"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="$0" android:textColor="#FF5252" android:textSize="16sp"
+                android:textStyle="bold" android:layout_marginTop="6dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Balance -->
+    <LinearLayout android:id="@+id/cardBalance"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:background="@drawable/finanzas_card_background"
+        android:padding="14dp" android:layout_marginStart="16dp" android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:text="Balance neto"
+            android:textColor="#AABBCC" android:textSize="14sp" />
+        <TextView android:id="@+id/tvBalance"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="$0" android:textColor="#4CAF50" android:textSize="20sp" android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="Movimientos recientes" android:textColor="#AABBCC"
+        android:textSize="13sp" android:textStyle="bold"
+        android:paddingStart="20dp" android:paddingEnd="20dp" android:paddingBottom="8dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerMovimientos"
+        android:layout_width="match_parent" android:layout_height="match_parent"
+        android:paddingStart="16dp" android:paddingEnd="16dp"
+        android:paddingBottom="16dp" android:clipToPadding="false" />
+
+</LinearLayout>

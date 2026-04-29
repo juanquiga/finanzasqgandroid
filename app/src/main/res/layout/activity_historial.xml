@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#0A1628">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/finanzas_card_background"
+        android:padding="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="6dp">
+
+        <ImageButton
+            android:id="@+id/btnVolverHistorial"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@null"
+            android:src="@android:drawable/ic_media_previous"
+            app:tint="#4CAF50" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📋 Historial" android:textColor="#4CAF50"
+            android:textSize="17sp" android:textStyle="bold"
+            android:gravity="center"/>
+        <TextView android:id="@+id/tvCountHistorial"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="0 registros" android:textColor="#445566" android:textSize="12sp"/>
+    </LinearLayout>
+
+    <!-- Filtros período -->
+    <LinearLayout android:id="@+id/layoutFiltrosPeriodo"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/finanzas_card_background"
+        android:padding="12dp"
+        android:layout_marginStart="16dp" android:layout_marginEnd="16dp"
+        android:layout_marginBottom="6dp">
+
+        <!-- Botones Todo / Mes / Año -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="8dp">
+            <Button android:id="@+id/btnHistTodo"
+                android:layout_width="0dp" android:layout_height="36dp"
+                android:layout_weight="1" android:text="Todo"
+                android:textSize="12sp" android:textAllCaps="false"
+                android:textColor="#050510" android:backgroundTint="#4CAF50"
+                android:layout_marginEnd="4dp"/>
+            <Button android:id="@+id/btnHistMes"
+                android:layout_width="0dp" android:layout_height="36dp"
+                android:layout_weight="1" android:text="Por mes"
+                android:textSize="12sp" android:textAllCaps="false"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A"
+                android:layout_marginEnd="4dp"/>
+            <Button android:id="@+id/btnHistAnio"
+                android:layout_width="0dp" android:layout_height="36dp"
+                android:layout_weight="1" android:text="Por año"
+                android:textSize="12sp" android:textAllCaps="false"
+                android:textColor="#4CAF50" android:backgroundTint="#0D1A2A"/>
+        </LinearLayout>
+
+        <!-- Spinners mes y año -->
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <Spinner android:id="@+id/spinnerMesHistorial"
+                android:layout_width="0dp" android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/finanzas_input_bg"
+                android:paddingStart="10dp"
+                android:popupBackground="#111E2E"
+                android:visibility="gone"
+                android:layout_marginEnd="6dp"/>
+            <Spinner android:id="@+id/spinnerAnioHistorial"
+                android:layout_width="0dp" android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/finanzas_input_bg"
+                android:paddingStart="10dp"
+                android:popupBackground="#111E2E"
+                android:visibility="gone"/>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Buscador -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="@drawable/finanzas_card_background"
+        android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingStart="14dp" android:paddingEnd="14dp"
+        android:paddingTop="10dp" android:paddingBottom="10dp"
+        android:layout_marginStart="16dp" android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="🔍" android:textSize="16sp" android:layout_marginEnd="10dp"/>
+        <EditText android:id="@+id/etBuscarHistorial"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:background="@null" android:hint="Buscar categoría, detalle..."
+            android:textColorHint="#334455" android:textColor="#EEFFEE"
+            android:textSize="14sp"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerHistorialCompleto"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:paddingStart="16dp" android:paddingEnd="16dp"
+        android:paddingBottom="16dp" android:clipToPadding="false"/>
+
+</LinearLayout>

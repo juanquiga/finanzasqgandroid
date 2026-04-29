@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_resumen"
+        android:icon="@drawable/ic_finanzas_home"
+        android:title="FinanzasQG" />
+    <item android:id="@+id/nav_registrar"
+        android:icon="@drawable/ic_finanzas_add"
+        android:title="Registrar" />
+    <item android:id="@+id/nav_graficas"
+        android:icon="@drawable/ic_finanzas_chart"
+        android:title="Gráficas" />
+    <item android:id="@+id/nav_cuenta"
+        android:icon="@drawable/ic_finanzas_settings"
+        android:title="Cuenta" />
+</menu>
