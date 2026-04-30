@@ -31,8 +31,8 @@ class Login : AppCompatActivity() {
     private lateinit var btnVerPass   : ImageButton
     private lateinit var auth         : FirebaseAuth
     private lateinit var googleClient : GoogleSignInClient
-    private val db = FirebaseDatabase.getInstance().reference
 
+    private val db        = FirebaseDatabase.getInstance().reference
     private val PREFS     = "finanzasqg_prefs"
     private val KEY_REC   = "recordar_sesion"
     private val KEY_EMAIL = "email_guardado"
@@ -43,11 +43,20 @@ class Login : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         auth = FirebaseAuth.getInstance()
-
         val prefs    = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val recordar = prefs.getBoolean(KEY_REC, false)
-        if (recordar && auth.currentUser != null) { irAMain(); return }
-        if (!recordar) auth.signOut()
+
+        // ── RECORDAR SESIÓN — verificar si el usuario sigue autenticado ──────
+        // Solo ir a Main si: recordar está activado Y hay usuario activo en Firebase Auth
+        if (recordar && auth.currentUser != null) {
+            irAMain()
+            return
+        }
+
+        // Si no recordar, cerrar sesión de Firebase para forzar login
+        if (!recordar) {
+            auth.signOut()
+        }
 
         setContentView(R.layout.activity_login)
 
@@ -60,17 +69,18 @@ class Login : AppCompatActivity() {
         checkRecordar = findViewById(R.id.checkRecordar)
         btnVerPass    = findViewById(R.id.btnVerContrasena)
 
-        // Configurar Google Sign-In
+        // Google Sign-In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
         googleClient = GoogleSignIn.getClient(this, gso)
 
-        val emailGuardado = prefs.getString(KEY_EMAIL, "")
-        if (!emailGuardado.isNullOrEmpty()) {
+        // Precargar email guardado
+        val emailGuardado = prefs.getString(KEY_EMAIL, "") ?: ""
+        if (emailGuardado.isNotEmpty()) {
             etEmail.setText(emailGuardado)
-            checkRecordar.isChecked = true
+            checkRecordar.isChecked = recordar
         }
 
         btnVerPass.setOnClickListener {
@@ -121,11 +131,14 @@ class Login : AppCompatActivity() {
                     .addOnCompleteListener(this) { task ->
                         if (task.isSuccessful) {
                             val user = auth.currentUser ?: return@addOnCompleteListener
-                            manejarLoginSocial(
-                                uid    = user.uid,
-                                email  = user.email ?: "",
-                                nombre = user.displayName ?: ""
-                            )
+                            // Guardar recordar sesión para Google
+                            getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
+                                putBoolean(KEY_REC, true)
+                                putString(KEY_EMAIL, user.email ?: "")
+                                apply()
+                            }
+                            manejarLoginSocial(user.uid, user.email ?: "",
+                                user.displayName ?: "")
                         } else {
                             Toast.makeText(this,
                                 "Error: ${task.exception?.message}",
@@ -145,16 +158,12 @@ class Login : AppCompatActivity() {
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snap: DataSnapshot) {
                     if (!snap.exists()) {
-                        db.child("users").child(uid).setValue(
-                            mapOf(
-                                "name"      to nombre.ifEmpty {
-                                    email.substringBefore("@")
-                                },
-                                "email"     to email,
-                                "uid"       to uid,
-                                "isNewUser" to true
-                            )
-                        ).addOnSuccessListener { irAOnboarding() }
+                        db.child("users").child(uid).setValue(mapOf(
+                            "name"      to nombre.ifEmpty { email.substringBefore("@") },
+                            "email"     to email,
+                            "uid"       to uid,
+                            "isNewUser" to true
+                        )).addOnSuccessListener { irAOnboarding() }
                     } else {
                         val isNew = snap.child("isNewUser")
                             .getValue(Boolean::class.java) ?: false
@@ -169,21 +178,21 @@ class Login : AppCompatActivity() {
         val prefs         = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val emailGuardado = prefs.getString(KEY_EMAIL, "") ?: ""
         val huellaActiva  = prefs.getBoolean("huella_activa", false)
-        if (emailGuardado.isEmpty() || !huellaActiva) return
+        val recordar      = prefs.getBoolean(KEY_REC, false)
+        if (emailGuardado.isEmpty() || !huellaActiva || !recordar) return
         try {
             val executor = ContextCompat.getMainExecutor(this)
             val callback = object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(
                     result: BiometricPrompt.AuthenticationResult) { irAMain() }
-                override fun onAuthenticationError(
-                    errorCode: Int, errString: CharSequence) {}
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {}
                 override fun onAuthenticationFailed() {
                     Toast.makeText(this@Login,
                         "Huella no reconocida", Toast.LENGTH_SHORT).show()
                 }
             }
             val prompt = BiometricPrompt(this, executor, callback)
-            val info   = BiometricPrompt.PromptInfo.Builder()
+            val info = BiometricPrompt.PromptInfo.Builder()
                 .setTitle("FinanzasQG")
                 .setSubtitle("Usa tu huella para ingresar")
                 .setNegativeButtonText("Usar contraseña")
@@ -207,8 +216,7 @@ class Login : AppCompatActivity() {
                 if (found != null) loginConEmail(found, pass)
                 else {
                     btnIngresar.isEnabled = true; btnIngresar.text = "INGRESAR"
-                    Toast.makeText(this@Login,
-                        "Usuario no encontrado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@Login, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
             }
             override fun onCancelled(e: DatabaseError) {
@@ -224,12 +232,14 @@ class Login : AppCompatActivity() {
                 btnIngresar.isEnabled = true; btnIngresar.text = "INGRESAR"
                 if (task.isSuccessful) {
                     val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    // Guardar preferencia de recordar
                     prefs.edit().apply {
                         putBoolean(KEY_REC, checkRecordar.isChecked)
-                        putString(KEY_EMAIL,
-                            if (checkRecordar.isChecked) correo else "")
+                        if (checkRecordar.isChecked) putString(KEY_EMAIL, correo)
+                        else remove(KEY_EMAIL)
                         apply()
                     }
+
                     val uid = auth.currentUser?.uid ?: ""
                     db.child("users").child(uid)
                         .addListenerForSingleValueEvent(object : ValueEventListener {
@@ -241,8 +251,7 @@ class Login : AppCompatActivity() {
                             override fun onCancelled(e: DatabaseError) { irAMain() }
                         })
                 } else {
-                    Toast.makeText(this,
-                        "Credenciales incorrectas", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Credenciales incorrectas", Toast.LENGTH_SHORT).show()
                 }
             }
     }
@@ -275,8 +284,7 @@ class Login : AppCompatActivity() {
         vista.findViewById<Button>(R.id.btnEnviarRecuperar).setOnClickListener {
             val correo = etEmailRec.text.toString().trim()
             if (correo.isEmpty()) {
-                etEmailRec.error = "Ingresa tu correo"; return@setOnClickListener
-            }
+                etEmailRec.error = "Ingresa tu correo"; return@setOnClickListener }
             auth.sendPasswordResetEmail(correo)
                 .addOnSuccessListener {
                     Toast.makeText(this, "Enlace enviado ✅", Toast.LENGTH_LONG).show()
@@ -286,9 +294,8 @@ class Login : AppCompatActivity() {
                     Toast.makeText(this, "Correo no encontrado", Toast.LENGTH_SHORT).show()
                 }
         }
-        vista.findViewById<Button>(R.id.btnCancelarRecuperar).setOnClickListener {
-            dialog.dismiss()
-        }
+        vista.findViewById<Button>(R.id.btnCancelarRecuperar)
+            .setOnClickListener { dialog.dismiss() }
         dialog.show()
     }
 }

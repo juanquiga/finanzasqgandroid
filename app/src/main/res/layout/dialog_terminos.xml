@@ -22,7 +22,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="• Tus datos se guardan de forma segura en Firebase\n\n• No compartimos tu información personal con terceros\n\n• El uso de la app es bajo tu responsabilidad\n\n• FinanzasQG es una herramienta educativa y financiera personal\n\n• Puedes eliminar tu cuenta y datos en cualquier momento\n\nVersión 1.0 — 2025"
+        android:text="• Tus datos se guardan de forma segura en Firebase\n\n• No compartimos tu información personal con terceros\n\n• El uso de la app es bajo tu responsabilidad\n\n• FinanzasQG es una herramienta educativa y financiera personal\n\n• Puedes eliminar tu cuenta y datos en cualquier momento\n\nVersión 1.0 — 2026"
         android:textColor="#9999BB"
         android:textSize="13sp"
         android:lineSpacingExtra="4dp"

@@ -9,19 +9,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
-import java.text.SimpleDateFormat
 import java.util.*
 
 class HistorialActivity : AppCompatActivity() {
 
-    private val db    = FirebaseDatabase.getInstance().reference
-    private val auth  = FirebaseAuth.getInstance()
-    private val todos = mutableListOf<Movimiento>()
+    private val db       = FirebaseDatabase.getInstance().reference
+    private val auth     = FirebaseAuth.getInstance()
+    private val todos    = mutableListOf<Movimiento>()
     private val filtrados = mutableListOf<Movimiento>()
     private lateinit var adapter: HistorialAdapter
 
-    private var filtroPeriodo = "Todo"  // Todo, Mes, Año
-    private var mesSeleccionado  = Calendar.getInstance().get(Calendar.MONTH)       // 0-11
+    private var filtroPeriodo    = "Todo"
+    private var mesSeleccionado  = Calendar.getInstance().get(Calendar.MONTH)
     private var anioSeleccionado = Calendar.getInstance().get(Calendar.YEAR)
 
     private val nombresMeses = listOf(
@@ -39,7 +38,6 @@ class HistorialActivity : AppCompatActivity() {
         val btnTodo       = findViewById<Button>(R.id.btnHistTodo)
         val btnMes        = findViewById<Button>(R.id.btnHistMes)
         val btnAnio       = findViewById<Button>(R.id.btnHistAnio)
-        val layoutFiltros = findViewById<LinearLayout>(R.id.layoutFiltrosPeriodo)
         val spinnerMes    = findViewById<Spinner>(R.id.spinnerMesHistorial)
         val spinnerAnio   = findViewById<Spinner>(R.id.spinnerAnioHistorial)
 
@@ -49,9 +47,11 @@ class HistorialActivity : AppCompatActivity() {
 
         btnVolver.setOnClickListener { finish() }
 
-        // Generar lista de años (5 años atrás hasta hoy)
+        // Años desde 2026 hasta el año actual + 5 años adelante
         val anioActual = Calendar.getInstance().get(Calendar.YEAR)
-        val anios = (anioActual downTo anioActual - 4).map { it.toString() }
+        val anioBase   = 2026
+        val anioFin    = maxOf(anioActual, anioBase) + 5
+        val anios      = (anioBase..anioFin).map { it.toString() }
 
         spinnerMes.adapter = ArrayAdapter(this,
             android.R.layout.simple_spinner_item, nombresMeses).also {
@@ -61,11 +61,14 @@ class HistorialActivity : AppCompatActivity() {
         spinnerAnio.adapter = ArrayAdapter(this,
             android.R.layout.simple_spinner_item, anios).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-        spinnerAnio.setSelection(0, false)
+        // Seleccionar el año actual
+        val idxAnio = anios.indexOf(anioActual.toString()).takeIf { it >= 0 } ?: 0
+        spinnerAnio.setSelection(idxAnio, false)
 
         spinnerMes.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                mesSeleccionado = pos; aplicarFiltros(etBuscar.text.toString(), tvCount)
+                mesSeleccionado = pos
+                aplicarFiltros(etBuscar.text.toString(), tvCount)
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
@@ -86,28 +89,28 @@ class HistorialActivity : AppCompatActivity() {
                 else android.graphics.Color.parseColor("#4CAF50"))
         }
 
-        fun actualizarBotonesFiltro() {
-            tint(btnTodo,  filtroPeriodo == "Todo")
-            tint(btnMes,   filtroPeriodo == "Mes")
-            tint(btnAnio,  filtroPeriodo == "Año")
-            // Mostrar spinners según filtro
-            val verMes  = filtroPeriodo == "Mes"
-            val verAnio = filtroPeriodo == "Mes" || filtroPeriodo == "Año"
-            spinnerMes.visibility  = if (verMes)  View.VISIBLE else View.GONE
-            spinnerAnio.visibility = if (verAnio) View.VISIBLE else View.GONE
+        fun actualizarBotones() {
+            tint(btnTodo, filtroPeriodo == "Todo")
+            tint(btnMes,  filtroPeriodo == "Mes")
+            tint(btnAnio, filtroPeriodo == "Año")
+            spinnerMes.visibility  =
+                if (filtroPeriodo == "Mes")  View.VISIBLE else View.GONE
+            spinnerAnio.visibility =
+                if (filtroPeriodo == "Mes" || filtroPeriodo == "Año") View.VISIBLE
+                else View.GONE
         }
 
         btnTodo.setOnClickListener {
-            filtroPeriodo = "Todo"; actualizarBotonesFiltro()
+            filtroPeriodo = "Todo"; actualizarBotones()
             aplicarFiltros(etBuscar.text.toString(), tvCount) }
         btnMes.setOnClickListener {
-            filtroPeriodo = "Mes"; actualizarBotonesFiltro()
+            filtroPeriodo = "Mes"; actualizarBotones()
             aplicarFiltros(etBuscar.text.toString(), tvCount) }
         btnAnio.setOnClickListener {
-            filtroPeriodo = "Año"; actualizarBotonesFiltro()
+            filtroPeriodo = "Año"; actualizarBotones()
             aplicarFiltros(etBuscar.text.toString(), tvCount) }
 
-        actualizarBotonesFiltro()
+        actualizarBotones()
 
         etBuscar.addTextChangedListener { text ->
             aplicarFiltros(text.toString().trim(), tvCount)
@@ -130,8 +133,6 @@ class HistorialActivity : AppCompatActivity() {
     }
 
     private fun aplicarFiltros(query: String, tvCount: TextView) {
-        val cal = Calendar.getInstance()
-
         val porPeriodo = when (filtroPeriodo) {
             "Mes" -> todos.filter { m ->
                 val c = Calendar.getInstance().apply { timeInMillis = m.timestamp }
@@ -155,7 +156,6 @@ class HistorialActivity : AppCompatActivity() {
                         it.cuenta.lowercase().contains(query.lowercase())
             }
         )
-
         tvCount.text = "${filtrados.size} registros"
         adapter.notifyDataSetChanged()
     }

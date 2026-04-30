@@ -294,11 +294,13 @@ class SetupCategoriasActivity : AppCompatActivity() {
 
         val cardCat = card()
         cardCat.addView(tvSeccion("🎯 Presupuesto por categoría"))
-        cardCat.addView(tvHint("Controla cuánto gastas en cada categoría de egreso"))
+        cardCat.addView(tvHint("Configura límites por categoría, subcategoría y sub-sub"))
 
         egresosTree.forEach { cat ->
-            val maxAct = maximosCategorias.getOrPut(cat.nombre) { mutableMapOf() }
+            val maxCat = maximosCategorias.getOrPut(cat.nombre) { mutableMapOf() }
             cardCat.addView(divider())
+
+            // Nombre de categoría
             cardCat.addView(TextView(this).apply {
                 text = "📂 ${cat.nombre}"
                 setTextColor(Color.WHITE); textSize = 14f
@@ -306,34 +308,110 @@ class SetupCategoriasActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    setMargins(0, dpToPx(8), 0, dpToPx(6)) }
+                    setMargins(0, dpToPx(8), 0, dpToPx(4)) }
             })
 
+            // COP categoría
             val rCOP = filaH()
             rCOP.addView(TextView(this).apply {
                 text = "COP"; setTextColor(Color.parseColor("#4CAF50")); textSize = 12f
                 layoutParams = LinearLayout.LayoutParams(dpToPx(44),
                     LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    gravity = android.view.Gravity.CENTER_VERTICAL }
-            })
+                    gravity = android.view.Gravity.CENTER_VERTICAL } })
             rCOP.addView(etNumero(
-                if ((maxAct["max_COP"] ?: 0.0) > 0)
-                    fmtNum((maxAct["max_COP"] ?: 0.0).toLong()) else ""
-            ) { maxAct["max_COP"] = it })
+                if ((maxCat["max_COP"] ?: 0.0) > 0)
+                    fmtNum((maxCat["max_COP"] ?: 0.0).toLong()) else ""
+            ) { maxCat["max_COP"] = it })
             cardCat.addView(rCOP)
 
+            // USD categoría
             val rUSD = filaH()
             rUSD.addView(TextView(this).apply {
                 text = "USD"; setTextColor(Color.parseColor("#2196F3")); textSize = 12f
                 layoutParams = LinearLayout.LayoutParams(dpToPx(44),
                     LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    gravity = android.view.Gravity.CENTER_VERTICAL }
-            })
+                    gravity = android.view.Gravity.CENTER_VERTICAL } })
             rUSD.addView(etNumeroUSD(
-                if ((maxAct["max_USD"] ?: 0.0) > 0)
-                    (maxAct["max_USD"] ?: 0.0).toString() else ""
-            ) { maxAct["max_USD"] = it })
+                if ((maxCat["max_USD"] ?: 0.0) > 0)
+                    (maxCat["max_USD"] ?: 0.0).toString() else ""
+            ) { maxCat["max_USD"] = it })
             cardCat.addView(rUSD)
+
+            // Subcategorías
+            cat.subcategorias.forEach { sub ->
+                val claveSub = "${cat.nombre} > ${sub.nombre}"
+                val maxSub   = maximosCategorias.getOrPut(claveSub) { mutableMapOf() }
+
+                cardCat.addView(TextView(this).apply {
+                    text = "   📁 ${sub.nombre}"
+                    setTextColor(Color.parseColor("#AABBCC")); textSize = 12f
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        setMargins(dpToPx(16), dpToPx(6), 0, dpToPx(2)) } })
+
+                val sSubCOP = filaH(dpToPx(16))
+                sSubCOP.addView(TextView(this).apply {
+                    text = "COP"; setTextColor(Color.parseColor("#4CAF50")); textSize = 11f
+                    layoutParams = LinearLayout.LayoutParams(dpToPx(44),
+                        LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        gravity = android.view.Gravity.CENTER_VERTICAL } })
+                sSubCOP.addView(etNumero(
+                    if ((maxSub["max_COP"] ?: 0.0) > 0)
+                        fmtNum((maxSub["max_COP"] ?: 0.0).toLong()) else ""
+                ) { maxSub["max_COP"] = it })
+                cardCat.addView(sSubCOP)
+
+                val sSubUSD = filaH(dpToPx(16))
+                sSubUSD.addView(TextView(this).apply {
+                    text = "USD"; setTextColor(Color.parseColor("#2196F3")); textSize = 11f
+                    layoutParams = LinearLayout.LayoutParams(dpToPx(44),
+                        LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                        gravity = android.view.Gravity.CENTER_VERTICAL } })
+                sSubUSD.addView(etNumeroUSD(
+                    if ((maxSub["max_USD"] ?: 0.0) > 0)
+                        (maxSub["max_USD"] ?: 0.0).toString() else ""
+                ) { maxSub["max_USD"] = it })
+                cardCat.addView(sSubUSD)
+
+                // Subsubcategorías
+                sub.subsubcategorias.forEach { ss ->
+                    val claveSS = "${cat.nombre} > ${sub.nombre} > $ss"
+                    val maxSS   = maximosCategorias.getOrPut(claveSS) { mutableMapOf() }
+
+                    cardCat.addView(TextView(this).apply {
+                        text = "      📌 $ss"
+                        setTextColor(Color.parseColor("#778899")); textSize = 11f
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                            setMargins(dpToPx(32), dpToPx(4), 0, dpToPx(2)) } })
+
+                    val sssCOP = filaH(dpToPx(32))
+                    sssCOP.addView(TextView(this).apply {
+                        text = "COP"; setTextColor(Color.parseColor("#4CAF50")); textSize = 10f
+                        layoutParams = LinearLayout.LayoutParams(dpToPx(44),
+                            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                            gravity = android.view.Gravity.CENTER_VERTICAL } })
+                    sssCOP.addView(etNumero(
+                        if ((maxSS["max_COP"] ?: 0.0) > 0)
+                            fmtNum((maxSS["max_COP"] ?: 0.0).toLong()) else ""
+                    ) { maxSS["max_COP"] = it })
+                    cardCat.addView(sssCOP)
+
+                    val sssUSD = filaH(dpToPx(32))
+                    sssUSD.addView(TextView(this).apply {
+                        text = "USD"; setTextColor(Color.parseColor("#2196F3")); textSize = 10f
+                        layoutParams = LinearLayout.LayoutParams(dpToPx(44),
+                            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                            gravity = android.view.Gravity.CENTER_VERTICAL } })
+                    sssUSD.addView(etNumeroUSD(
+                        if ((maxSS["max_USD"] ?: 0.0) > 0)
+                            (maxSS["max_USD"] ?: 0.0).toString() else ""
+                    ) { maxSS["max_USD"] = it })
+                    cardCat.addView(sssUSD)
+                }
+            }
         }
         container.addView(cardCat)
     }

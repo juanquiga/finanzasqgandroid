@@ -15,7 +15,7 @@
             android:textSize="18sp" android:textStyle="bold" android:gravity="center"/>
     </LinearLayout>
 
-    <!-- Selector tipo — texto más corto para que no se corte -->
+    <!-- Selector tipo -->
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:background="@drawable/finanzas_card_background"
@@ -27,8 +27,7 @@
         <Button android:id="@+id/btnTipoEgreso"
             android:layout_width="0dp" android:layout_height="44dp"
             android:layout_weight="1"
-            android:text="📉 Egreso"
-            android:textSize="12sp"
+            android:text="📉 Egreso" android:textSize="12sp"
             android:textAllCaps="false"
             android:textColor="#FFFFFF" android:textStyle="bold"
             android:backgroundTint="#FF5252"
@@ -37,8 +36,7 @@
         <Button android:id="@+id/btnTipoIngreso"
             android:layout_width="0dp" android:layout_height="44dp"
             android:layout_weight="1"
-            android:text="📈 Ingreso"
-            android:textSize="12sp"
+            android:text="📈 Ingreso" android:textSize="12sp"
             android:textAllCaps="false"
             android:textColor="#4CAF50"
             android:backgroundTint="#0D1A2A"
@@ -47,12 +45,10 @@
         <Button android:id="@+id/btnTipoTransferencia"
             android:layout_width="0dp" android:layout_height="44dp"
             android:layout_weight="1"
-            android:text="🔄 Transfer"
-            android:textSize="11sp"
+            android:text="🔄 Transfer" android:textSize="11sp"
             android:textAllCaps="false"
             android:textColor="#2196F3"
             android:backgroundTint="#0D1A2A"/>
-
     </LinearLayout>
 
     <ScrollView android:layout_width="match_parent" android:layout_height="match_parent">
@@ -69,6 +65,7 @@
                 android:padding="16dp" android:layout_marginTop="4dp"
                 android:layout_marginBottom="12dp">
 
+                <!-- CATEGORÍA -->
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="CATEGORÍA" android:textColor="#4CAF50"
                     android:textSize="11sp" android:letterSpacing="0.1"
@@ -85,17 +82,20 @@
                         android:background="@null" android:popupBackground="#111E2E"/>
                 </LinearLayout>
 
+                <!-- SUBCATEGORÍA -->
                 <TextView android:id="@+id/tvLabelSubcat"
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="SUBCATEGORÍA" android:textColor="#4CAF50"
                     android:textSize="11sp" android:letterSpacing="0.1"
-                    android:layout_marginBottom="6dp"/>
+                    android:layout_marginBottom="6dp"
+                    android:visibility="gone"/>
                 <LinearLayout android:id="@+id/layoutSubcat"
                     android:layout_width="match_parent" android:layout_height="50dp"
                     android:background="@drawable/finanzas_input_bg"
                     android:orientation="horizontal" android:gravity="center_vertical"
                     android:paddingStart="12dp" android:paddingEnd="12dp"
-                    android:layout_marginBottom="12dp">
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone">
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:text="📂" android:textSize="15sp" android:layout_marginEnd="8dp"/>
                     <Spinner android:id="@+id/spinnerSubcategoria"
@@ -103,6 +103,28 @@
                         android:background="@null" android:popupBackground="#111E2E"/>
                 </LinearLayout>
 
+                <!-- SUBSUBCATEGORÍA -->
+                <TextView android:id="@+id/tvLabelSubSubcat"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="DETALLE CATEGORÍA" android:textColor="#4CAF50"
+                    android:textSize="11sp" android:letterSpacing="0.1"
+                    android:layout_marginBottom="6dp"
+                    android:visibility="gone"/>
+                <LinearLayout android:id="@+id/layoutSubSubcat"
+                    android:layout_width="match_parent" android:layout_height="50dp"
+                    android:background="@drawable/finanzas_input_bg"
+                    android:orientation="horizontal" android:gravity="center_vertical"
+                    android:paddingStart="12dp" android:paddingEnd="12dp"
+                    android:layout_marginBottom="12dp"
+                    android:visibility="gone">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="📌" android:textSize="15sp" android:layout_marginEnd="8dp"/>
+                    <Spinner android:id="@+id/spinnerSubSubcategoria"
+                        android:layout_width="match_parent" android:layout_height="match_parent"
+                        android:background="@null" android:popupBackground="#111E2E"/>
+                </LinearLayout>
+
+                <!-- DETALLE -->
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="DETALLE (opcional)" android:textColor="#4CAF50"
                     android:textSize="11sp" android:letterSpacing="0.1"
@@ -121,6 +143,7 @@
                         android:textColor="#EEFFEE"/>
                 </LinearLayout>
 
+                <!-- VALOR -->
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="VALOR" android:textColor="#4CAF50"
                     android:textSize="11sp" android:letterSpacing="0.1"
@@ -146,10 +169,11 @@
 
                 <TextView android:id="@+id/tvMonedaBadge"
                     android:layout_width="wrap_content" android:layout_height="wrap_content"
-                    android:text="🇨🇴 COP"
-                    android:textColor="#4CAF50" android:textSize="12sp"
+                    android:text="🇨🇴 COP" android:textColor="#4CAF50"
+                    android:textSize="12sp"
                     android:layout_marginBottom="12dp" android:layout_marginStart="4dp"/>
 
+                <!-- CUENTA -->
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="CUENTA" android:textColor="#4CAF50"
                     android:textSize="11sp" android:letterSpacing="0.1"
@@ -177,8 +201,7 @@
 
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="CUENTA ORIGEN" android:textColor="#4CAF50"
-                    android:textSize="11sp" android:letterSpacing="0.1"
-                    android:layout_marginBottom="6dp"/>
+                    android:textSize="11sp" android:layout_marginBottom="6dp"/>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="50dp"
                     android:background="@drawable/finanzas_input_bg"
                     android:orientation="horizontal" android:gravity="center_vertical"
@@ -193,8 +216,7 @@
 
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="CUENTA DESTINO" android:textColor="#4CAF50"
-                    android:textSize="11sp" android:letterSpacing="0.1"
-                    android:layout_marginBottom="6dp"/>
+                    android:textSize="11sp" android:layout_marginBottom="6dp"/>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="50dp"
                     android:background="@drawable/finanzas_input_bg"
                     android:orientation="horizontal" android:gravity="center_vertical"
@@ -209,8 +231,7 @@
 
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="DETALLE (opcional)" android:textColor="#4CAF50"
-                    android:textSize="11sp" android:letterSpacing="0.1"
-                    android:layout_marginBottom="6dp"/>
+                    android:textSize="11sp" android:layout_marginBottom="6dp"/>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="50dp"
                     android:background="@drawable/finanzas_input_bg"
                     android:orientation="horizontal" android:gravity="center_vertical"
@@ -225,8 +246,7 @@
 
                 <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
                     android:text="VALOR" android:textColor="#4CAF50"
-                    android:textSize="11sp" android:letterSpacing="0.1"
-                    android:layout_marginBottom="6dp"/>
+                    android:textSize="11sp" android:layout_marginBottom="6dp"/>
                 <LinearLayout android:layout_width="match_parent" android:layout_height="50dp"
                     android:background="@drawable/finanzas_input_bg"
                     android:orientation="horizontal" android:gravity="center_vertical"
@@ -243,7 +263,8 @@
                 android:layout_width="match_parent" android:layout_height="54dp"
                 android:text="GUARDAR MOVIMIENTO"
                 android:textAllCaps="false"
-                android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold"
+                android:textColor="#FFFFFF" android:textSize="15sp"
+                android:textStyle="bold"
                 android:background="@drawable/finanzas_btn_green"/>
 
         </LinearLayout>

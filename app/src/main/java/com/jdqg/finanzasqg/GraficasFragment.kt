@@ -81,26 +81,51 @@ class GraficasFragment : Fragment() {
         refCfg = db.child("configuracion").child(uid)
         listenerConfig = object : ValueEventListener {
             override fun onDataChange(snap: DataSnapshot) {
-
                 presupuestoMaxCOP = snap.child("presupuestoMax")
                     .child("max_COP").getValue(Double::class.java) ?: 0.0
                 presupuestoMaxUSD = snap.child("presupuestoMax")
                     .child("max_USD").getValue(Double::class.java) ?: 0.0
 
-                // 🔥 CAMBIO AQUÍ (LO ÚNICO MODIFICADO)
                 maximosCategorias.clear()
 
+                // Leer presupuesto: categoría, subcategoría y subsubcategoría
                 val snapCat = if (snap.child("presupuestoCategorias").exists())
                     snap.child("presupuestoCategorias")
-                else
-                    snap.child("maximosCategorias")
+                else snap.child("maximosCategorias")
 
                 for (s in snapCat.children) {
                     val cat = s.key ?: continue
                     val m   = mutableMapOf<String, Double>()
                     m["max_COP"] = s.child("max_COP").getValue(Double::class.java) ?: 0.0
                     m["max_USD"] = s.child("max_USD").getValue(Double::class.java) ?: 0.0
-                    maximosCategorias[cat] = m
+
+                    // Subcategorías dentro de cada categoría
+                    for (sub in s.child("subcategorias").children) {
+                        val subNombre = sub.key ?: continue
+                        val mSub      = mutableMapOf<String, Double>()
+                        mSub["max_COP"] = sub.child("max_COP")
+                            .getValue(Double::class.java) ?: 0.0
+                        mSub["max_USD"] = sub.child("max_USD")
+                            .getValue(Double::class.java) ?: 0.0
+
+                        // Subsubcategorías
+                        for (subsub in sub.child("subsubcategorias").children) {
+                            val ssNombre = subsub.key ?: continue
+                            val mSS      = mutableMapOf<String, Double>()
+                            mSS["max_COP"] = subsub.child("max_COP")
+                                .getValue(Double::class.java) ?: 0.0
+                            mSS["max_USD"] = subsub.child("max_USD")
+                                .getValue(Double::class.java) ?: 0.0
+                            if ((mSS["max_COP"] ?: 0.0) > 0 || (mSS["max_USD"] ?: 0.0) > 0)
+                                maximosCategorias["$cat > $subNombre > $ssNombre"] = mSS
+                        }
+
+                        if ((mSub["max_COP"] ?: 0.0) > 0 || (mSub["max_USD"] ?: 0.0) > 0)
+                            maximosCategorias["$cat > $subNombre"] = mSub
+                    }
+
+                    if ((m["max_COP"] ?: 0.0) > 0 || (m["max_USD"] ?: 0.0) > 0)
+                        maximosCategorias[cat] = m
                 }
 
                 if (isAdded) renderizar()
@@ -336,116 +361,151 @@ class GraficasFragment : Fragment() {
     ) {
         container.removeAllViews()
 
-        // Gastos reales por categoría en el mes
-        val gastoPorCat = movimientos
-            .filter {
-                it.tipoTransaccion == "Egreso" &&
-                        run {
-                            val cal = Calendar.getInstance().apply { timeInMillis = it.timestamp }
-                            cal.get(Calendar.MONTH) == ahora.get(Calendar.MONTH) &&
-                                    cal.get(Calendar.YEAR)  == ahora.get(Calendar.YEAR)
-                        }
+        // Gasto real: categoría
+        val gastoCat = movimientos.filter {
+            it.tipoTransaccion == "Egreso" && run {
+                val cal = Calendar.getInstance().apply { timeInMillis = it.timestamp }
+                cal.get(Calendar.MONTH) == ahora.get(Calendar.MONTH) &&
+                        cal.get(Calendar.YEAR)  == ahora.get(Calendar.YEAR)
             }
-            .groupBy { it.categoria }
+        }.groupBy { it.categoria }.mapValues { (_, v) -> v.sumOf { it.valor } }
+
+        // Gasto real: subcategoría (clave: "cat > sub")
+        val gastoSub = movimientos.filter {
+            it.tipoTransaccion == "Egreso" && run {
+                val cal = Calendar.getInstance().apply { timeInMillis = it.timestamp }
+                cal.get(Calendar.MONTH) == ahora.get(Calendar.MONTH) &&
+                        cal.get(Calendar.YEAR)  == ahora.get(Calendar.YEAR)
+            }
+        }.groupBy { "${it.categoria} > ${it.subcategoria}" }
             .mapValues { (_, v) -> v.sumOf { it.valor } }
 
-        // Unir categorías con máximo configurado Y categorías con gasto
-        val todasCats = mutableSetOf<String>()
-        todasCats.addAll(maximosCategorias.keys)
-        todasCats.addAll(gastoPorCat.keys)
+        // Gasto real: subsubcategoría (clave: "cat > sub > subsub")
+        val gastoSubSub = movimientos.filter {
+            it.tipoTransaccion == "Egreso" && run {
+                val cal = Calendar.getInstance().apply { timeInMillis = it.timestamp }
+                cal.get(Calendar.MONTH) == ahora.get(Calendar.MONTH) &&
+                        cal.get(Calendar.YEAR)  == ahora.get(Calendar.YEAR)
+            }
+        }.groupBy { "${it.categoria} > ${it.subcategoria} > ${it.subsubcategoria}" }
+            .mapValues { (_, v) -> v.sumOf { it.valor } }
+
+        val todasCats = (maximosCategorias.keys +
+                gastoCat.keys +
+                gastoSub.keys.map { it.substringBefore(" > ") } +
+                gastoSubSub.keys.map { it.substringBefore(" > ") }).toSet()
 
         if (todasCats.isEmpty()) {
             container.addView(TextView(requireContext()).apply {
-                text = "Sin datos. Agrega egresos o configura máximos en ⚙️"
+                text = "Sin datos. Agrega egresos o configura presupuestos en ⚙️"
                 setTextColor(Color.parseColor("#445566"))
-                textSize = 12f
-                gravity = android.view.Gravity.CENTER
+                textSize = 12f; gravity = android.view.Gravity.CENTER
                 setPadding(0, dpToPx(12), 0, dpToPx(12))
-            })
-            return
+            }); return
         }
 
-        for (cat in todasCats.sorted()) {
-            val gasto = gastoPorCat[cat] ?: 0.0
-            val max   = maximosCategorias[cat]?.get("max_$monedaKey") ?: 0.0
-            val pct   = if (max > 0) ((gasto / max) * 100).toInt().coerceIn(0, 100) else 0
+        // Agrupar las claves de maximosCategorias por nivel
+        val maxPorCategoria    = maximosCategorias.filter { !it.key.contains(" > ") }
+        val maxPorSubcat       = maximosCategorias.filter { it.key.count { c -> c == '>' } == 1 }
+        val maxPorSubSubcat    = maximosCategorias.filter { it.key.count { c -> c == '>' } == 2 }
 
+        // Unir todas las claves relevantes
+        val todasClaves = (maxPorCategoria.keys +
+                maxPorSubcat.keys +
+                maxPorSubSubcat.keys +
+                gastoCat.keys +
+                gastoSub.filter { it.value > 0 }.keys +
+                gastoSubSub.filter { it.value > 0 }.keys).toSet()
+
+        for (clave in todasClaves.sorted()) {
+            val nivel = clave.count { it == '>' }
+            val gasto = when (nivel) {
+                0 -> gastoCat[clave] ?: 0.0
+                1 -> gastoSub[clave] ?: 0.0
+                2 -> gastoSubSub[clave] ?: 0.0
+                else -> 0.0
+            }
+            val max   = maximosCategorias[clave]?.get("max_$monedaKey") ?: 0.0
+            if (max <= 0 && gasto <= 0) continue
+
+            val pct   = if (max > 0) ((gasto / max) * 100).toInt().coerceIn(0, 100) else 0
             val color = when {
-                max <= 0  -> "#2196F3"   // Sin límite — azul
-                pct >= 90 -> "#FF5252"   // Peligro — rojo
-                pct >= 70 -> "#FF9800"   // Advertencia — naranja
-                else      -> "#4CAF50"   // Ok — verde
+                max <= 0  -> "#2196F3"
+                pct >= 90 -> "#FF5252"
+                pct >= 70 -> "#FF9800"
+                else      -> "#4CAF50"
             }
 
-            // Card para cada categoría
+            // Indentación según nivel
+            val indent = dpToPx(nivel * 16)
+            val emoji  = when (nivel) { 0 -> "📂"; 1 -> "📁"; else -> "📌" }
+            // Mostrar solo la parte final de la clave
+            val nombre = clave.substringAfterLast(" > ")
+
             val card = LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.VERTICAL
-                setBackgroundColor(Color.parseColor("#0D1A2A"))
-                setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
+                setBackgroundColor(Color.parseColor(
+                    when (nivel) { 0 -> "#0D1A2A"; 1 -> "#0A1520"; else -> "#081018" }))
+                setPadding(dpToPx(12) + indent, dpToPx(8), dpToPx(12), dpToPx(8))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    setMargins(0, 0, 0, dpToPx(8))
+                    setMargins(0, 0, 0, dpToPx(4))
                 }
             }
 
-            // Fila superior: nombre + porcentaje
             val filaTop = LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity     = android.view.Gravity.CENTER_VERTICAL
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    setMargins(0, 0, 0, dpToPx(6))
+                    setMargins(0, 0, 0, dpToPx(4))
                 }
             }
             filaTop.addView(TextView(requireContext()).apply {
-                text = cat
+                text = "$emoji $nombre"
                 setTextColor(Color.WHITE)
-                textSize = 13f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                textSize = when (nivel) { 0 -> 13f; 1 -> 12f; else -> 11f }
+                if (nivel == 0) setTypeface(typeface, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
             filaTop.addView(TextView(requireContext()).apply {
                 text = if (max > 0) "$pct%" else "Sin límite"
                 setTextColor(Color.parseColor(color))
-                textSize = 12f
+                textSize = 11f
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
             })
             card.addView(filaTop)
 
-            // Fila valores: gastado / máximo
             card.addView(TextView(requireContext()).apply {
                 text = if (max > 0)
-                    "Gastado: ${fmt(gasto)}  /  Máx: ${fmt(max)}"
+                    "Gastado: ${fmt(gasto)}  /  Presupuesto: ${fmt(max)}"
                 else
-                    "Gastado: ${fmt(gasto)}  (sin límite configurado)"
+                    "Gastado: ${fmt(gasto)}"
                 setTextColor(Color.parseColor("#AABBCC"))
-                textSize = 11f
+                textSize = 10f
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    setMargins(0, 0, 0, dpToPx(6))
+                    setMargins(0, 0, 0, dpToPx(4))
                 }
             })
 
-            // Barra de progreso solo si hay máximo
             if (max > 0) {
                 val barra = ProgressBar(requireContext(), null,
                     android.R.attr.progressBarStyleHorizontal).apply {
-                    this.max = 100
-                    progress = pct
+                    this.max = 100; progress = pct
                     progressTintList = android.content.res.ColorStateList.valueOf(
                         Color.parseColor(color))
                     progressBackgroundTintList = android.content.res.ColorStateList.valueOf(
                         Color.parseColor("#1E3A4A"))
                     layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(14))
+                        LinearLayout.LayoutParams.MATCH_PARENT, dpToPx(10))
                 }
                 card.addView(barra)
             }
-
             container.addView(card)
         }
     }
