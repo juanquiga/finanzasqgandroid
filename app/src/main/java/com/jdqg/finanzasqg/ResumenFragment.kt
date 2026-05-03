@@ -22,13 +22,12 @@ class ResumenFragment : Fragment() {
     private val listaFiltrada = mutableListOf<Movimiento>()
     private lateinit var adapter: MovimientoAdapter
 
-    private var periodoActual  = "mensual"
-    private var filtroTipo     = "Todo"
-    private var filtroMoneda   = "AMBAS"
+    private var periodoActual = "mensual"
+    private var filtroTipo    = "Todo"
+    private var filtroMoneda  = "AMBAS"
 
-    // Listeners activos — para removerlos al destruir el fragment
-    private var listenerMovimientos: ValueEventListener? = null
-    private var refMovimientos: DatabaseReference? = null
+    private var listenerMov: ValueEventListener? = null
+    private var refMov: DatabaseReference? = null
 
     private lateinit var tvSaludo    : TextView
     private lateinit var tvIngresos  : TextView
@@ -54,20 +53,20 @@ class ResumenFragment : Fragment() {
     ): View {
         val view = inflater.inflate(R.layout.fragment_resumen, container, false)
 
-        tvSaludo       = view.findViewById(R.id.tvSaludoResumen)
-        tvIngresos     = view.findViewById(R.id.tvTotalIngresos)
-        tvEgresos      = view.findViewById(R.id.tvTotalEgresos)
-        tvBalance      = view.findViewById(R.id.tvBalance)
-        cardBalance    = view.findViewById(R.id.cardBalance)
-        cardIngresos   = view.findViewById(R.id.cardIngresos)
-        cardEgresos    = view.findViewById(R.id.cardEgresos)
-        btnDiario      = view.findViewById(R.id.btnDiario)
-        btnMensual     = view.findViewById(R.id.btnMensual)
-        btnAnual       = view.findViewById(R.id.btnAnual)
-        btnTodo        = view.findViewById(R.id.btnFiltroTodo)
-        btnIngreso     = view.findViewById(R.id.btnFiltroIngreso)
-        btnEgreso      = view.findViewById(R.id.btnFiltroEgreso)
-        btnTransf      = view.findViewById(R.id.btnFiltroTransferencia)
+        tvSaludo      = view.findViewById(R.id.tvSaludoResumen)
+        tvIngresos    = view.findViewById(R.id.tvTotalIngresos)
+        tvEgresos     = view.findViewById(R.id.tvTotalEgresos)
+        tvBalance     = view.findViewById(R.id.tvBalance)
+        cardBalance   = view.findViewById(R.id.cardBalance)
+        cardIngresos  = view.findViewById(R.id.cardIngresos)
+        cardEgresos   = view.findViewById(R.id.cardEgresos)
+        btnDiario     = view.findViewById(R.id.btnDiario)
+        btnMensual    = view.findViewById(R.id.btnMensual)
+        btnAnual      = view.findViewById(R.id.btnAnual)
+        btnTodo       = view.findViewById(R.id.btnFiltroTodo)
+        btnIngreso    = view.findViewById(R.id.btnFiltroIngreso)
+        btnEgreso     = view.findViewById(R.id.btnFiltroEgreso)
+        btnTransf     = view.findViewById(R.id.btnFiltroTransferencia)
         btnMonedaTodas = view.findViewById(R.id.btnMonedaTodas)
         btnMonedaCOP   = view.findViewById(R.id.btnMonedaCOP)
         btnMonedaUSD   = view.findViewById(R.id.btnMonedaUSD)
@@ -77,7 +76,6 @@ class ResumenFragment : Fragment() {
         adapter = MovimientoAdapter(listaFiltrada)
         recycler.adapter = adapter
 
-        // Cargar nombre
         val uid = auth.currentUser?.uid ?: ""
         db.child("users").child(uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
@@ -89,92 +87,77 @@ class ResumenFragment : Fragment() {
                 override fun onCancelled(e: DatabaseError) {}
             })
 
-        // Botones período
         btnDiario.setOnClickListener  { periodoActual = "diario";  actualizarBotonesPeriodo(); aplicarFiltros() }
         btnMensual.setOnClickListener { periodoActual = "mensual"; actualizarBotonesPeriodo(); aplicarFiltros() }
         btnAnual.setOnClickListener   { periodoActual = "anual";   actualizarBotonesPeriodo(); aplicarFiltros() }
-
-        // Botones tipo
-        btnTodo.setOnClickListener    { filtroTipo = "Todo";          actualizarBotonesFiltr(); aplicarFiltros() }
-        btnIngreso.setOnClickListener { filtroTipo = "Ingreso";       actualizarBotonesFiltr(); aplicarFiltros() }
-        btnEgreso.setOnClickListener  { filtroTipo = "Egreso";        actualizarBotonesFiltr(); aplicarFiltros() }
+        btnTodo.setOnClickListener    { filtroTipo = "Todo";       actualizarBotonesFiltr();   aplicarFiltros() }
+        btnIngreso.setOnClickListener { filtroTipo = "Ingreso";    actualizarBotonesFiltr();   aplicarFiltros() }
+        btnEgreso.setOnClickListener  { filtroTipo = "Egreso";     actualizarBotonesFiltr();   aplicarFiltros() }
         btnTransf.setOnClickListener  { filtroTipo = "Transferencia"; actualizarBotonesFiltr(); aplicarFiltros() }
-
-        // Botones moneda
         btnMonedaTodas.setOnClickListener { filtroMoneda = "AMBAS"; actualizarBotonesMoneda(); aplicarFiltros() }
         btnMonedaCOP.setOnClickListener   { filtroMoneda = "COP";   actualizarBotonesMoneda(); aplicarFiltros() }
         btnMonedaUSD.setOnClickListener   { filtroMoneda = "USD";   actualizarBotonesMoneda(); aplicarFiltros() }
 
-        actualizarBotonesPeriodo()
-        actualizarBotonesFiltr()
-        actualizarBotonesMoneda()
-
-        // Escuchar movimientos en tiempo real — igual que Xcode
-        iniciarListenerMovimientos(uid)
-
+        actualizarBotonesPeriodo(); actualizarBotonesFiltr(); actualizarBotonesMoneda()
+        iniciarListener(uid)
         return view
     }
 
-    private fun iniciarListenerMovimientos(uid: String) {
-        refMovimientos = db.child("movimientos").child(uid)
-        listenerMovimientos = object : ValueEventListener {
+    // Obtiene la fecha efectiva del movimiento (personalizada o timestamp)
+    private fun fechaEfectiva(m: Movimiento): Long =
+        if (m.fechaPersonalizada > 0) m.fechaPersonalizada else m.timestamp
+
+    private fun iniciarListener(uid: String) {
+        refMov = db.child("movimientos").child(uid)
+        listenerMov = object : ValueEventListener {
             override fun onDataChange(snap: DataSnapshot) {
                 todos.clear()
                 for (child in snap.children) {
                     val m = child.getValue(Movimiento::class.java) ?: continue
                     todos.add(m)
                 }
-                todos.sortByDescending { it.timestamp }
+                todos.sortByDescending { fechaEfectiva(it) }
                 if (isAdded) aplicarFiltros()
             }
             override fun onCancelled(e: DatabaseError) {}
         }
-        refMovimientos?.addValueEventListener(listenerMovimientos!!)
+        refMov?.addValueEventListener(listenerMov!!)
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        listenerMovimientos?.let { refMovimientos?.removeEventListener(it) }
+        listenerMov?.let { refMov?.removeEventListener(it) }
     }
 
-    private fun tint(btn: Button, activo: Boolean, colorActivo: String = "#4CAF50") {
+    private fun tint(btn: Button, activo: Boolean, clr: String = "#4CAF50") {
         btn.backgroundTintList = ColorStateList.valueOf(
-            if (activo) Color.parseColor(colorActivo) else Color.parseColor("#0D1A2A"))
-        btn.setTextColor(
-            if (activo) Color.parseColor("#050510") else Color.parseColor(colorActivo))
+            if (activo) Color.parseColor(clr) else Color.parseColor("#0D1A2A"))
+        btn.setTextColor(if (activo) Color.parseColor("#050510") else Color.parseColor(clr))
     }
 
     private fun actualizarBotonesPeriodo() {
-        tint(btnDiario,  periodoActual == "diario")
-        tint(btnMensual, periodoActual == "mensual")
-        tint(btnAnual,   periodoActual == "anual")
+        tint(btnDiario, periodoActual=="diario"); tint(btnMensual, periodoActual=="mensual")
+        tint(btnAnual, periodoActual=="anual")
     }
-
     private fun actualizarBotonesFiltr() {
-        tint(btnTodo,   filtroTipo == "Todo")
-        tint(btnIngreso,filtroTipo == "Ingreso")
-        tint(btnEgreso, filtroTipo == "Egreso")
-        tint(btnTransf, filtroTipo == "Transferencia")
-
-        cardIngresos.visibility = if (filtroTipo == "Egreso" ||
-            filtroTipo == "Transferencia") View.GONE else View.VISIBLE
-        cardEgresos.visibility  = if (filtroTipo == "Ingreso" ||
-            filtroTipo == "Transferencia") View.GONE else View.VISIBLE
+        tint(btnTodo, filtroTipo=="Todo"); tint(btnIngreso, filtroTipo=="Ingreso")
+        tint(btnEgreso, filtroTipo=="Egreso"); tint(btnTransf, filtroTipo=="Transferencia")
+        cardIngresos.visibility = if (filtroTipo == "Egreso" || filtroTipo == "Transferencia") View.GONE else View.VISIBLE
+        cardEgresos.visibility  = if (filtroTipo == "Ingreso" || filtroTipo == "Transferencia") View.GONE else View.VISIBLE
         cardBalance.visibility  = if (filtroTipo == "Todo") View.VISIBLE else View.GONE
     }
-
     private fun actualizarBotonesMoneda() {
-        tint(btnMonedaTodas, filtroMoneda == "AMBAS")
-        tint(btnMonedaCOP,   filtroMoneda == "COP")
-        tint(btnMonedaUSD,   filtroMoneda == "USD")
+        tint(btnMonedaTodas, filtroMoneda=="AMBAS"); tint(btnMonedaCOP, filtroMoneda=="COP")
+        tint(btnMonedaUSD, filtroMoneda=="USD")
     }
 
     private fun aplicarFiltros() {
         if (!isAdded) return
         val ahora = Calendar.getInstance()
 
+        // Usa fechaEfectiva para los filtros de período
         val porPeriodo = todos.filter { m ->
-            val cal = Calendar.getInstance().apply { timeInMillis = m.timestamp }
+            val cal = Calendar.getInstance().apply { timeInMillis = fechaEfectiva(m) }
             when (periodoActual) {
                 "diario"  -> cal.get(Calendar.DAY_OF_YEAR) == ahora.get(Calendar.DAY_OF_YEAR) &&
                         cal.get(Calendar.YEAR) == ahora.get(Calendar.YEAR)
@@ -199,27 +182,25 @@ class ResumenFragment : Fragment() {
         })
         adapter.notifyDataSetChanged()
 
-        val monedaDisplay = if (filtroMoneda == "USD") "USD" else "COP"
+        val monedaD  = if (filtroMoneda == "USD") "USD" else "COP"
         val ingresos = porMoneda.filter { it.tipoTransaccion == "Ingreso" }.sumOf { it.valor }
         val egresos  = porMoneda.filter { it.tipoTransaccion == "Egreso"  }.sumOf { it.valor }
         val balance  = ingresos - egresos
 
-        tvIngresos.text = formatValor(ingresos, monedaDisplay)
-        tvEgresos.text  = formatValor(egresos,  monedaDisplay)
-        tvBalance.text  = formatValor(balance,  monedaDisplay)
+        tvIngresos.text = fmt(ingresos, monedaD)
+        tvEgresos.text  = fmt(egresos,  monedaD)
+        tvBalance.text  = fmt(balance,  monedaD)
         tvBalance.setTextColor(Color.parseColor(if (balance >= 0) "#4CAF50" else "#FF5252"))
     }
 
-    private fun formatValor(valor: Double, moneda: String): String {
+    private fun fmt(valor: Double, moneda: String): String {
         return if (moneda == "USD") {
             val f = NumberFormat.getNumberInstance(Locale.US).apply {
-                maximumFractionDigits = 2; minimumFractionDigits = 0
-            }
+                maximumFractionDigits = 2; minimumFractionDigits = 0 }
             "${f.format(valor)}USD"
         } else {
             val f = NumberFormat.getNumberInstance(Locale("es","CO")).apply {
-                maximumFractionDigits = 0
-            }
+                maximumFractionDigits = 0 }
             "$${f.format(valor)}"
         }
     }

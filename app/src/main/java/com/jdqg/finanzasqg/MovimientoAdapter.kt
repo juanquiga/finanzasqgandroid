@@ -19,6 +19,7 @@ class MovimientoAdapter(
 
     private val db   = FirebaseDatabase.getInstance().reference
     private val auth = FirebaseAuth.getInstance()
+    private val sdf  = SimpleDateFormat("dd/MM/yyyy  HH:mm", Locale.getDefault())
 
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvTipo     : TextView = v.findViewById(R.id.tvTipoIndicador)
@@ -49,15 +50,15 @@ class MovimientoAdapter(
         holder.tvDetalle.text   = m.detalle.ifEmpty {
             if (esTransf) "${m.cuentaOrigen} → ${m.cuenta}" else "" }
 
-        holder.tvFecha.text = if (m.timestamp > 0)
-            SimpleDateFormat("dd/MM/yyyy  HH:mm", Locale.getDefault()).format(Date(m.timestamp))
+        // Usar fechaPersonalizada si existe, sino timestamp
+        val fechaMs = if (m.fechaPersonalizada > 0) m.fechaPersonalizada else m.timestamp
+        holder.tvFecha.text = if (fechaMs > 0) sdf.format(Date(fechaMs))
         else m.fechaTransaccion
 
-        holder.tvValor.text = formatValor(m.valor, m.moneda)
+        holder.tvValor.text = fmt(m.valor, m.moneda)
         holder.tvValor.setTextColor(Color.parseColor(when {
             esIngreso -> "#69F0AE"; esTransf -> "#2196F3"; else -> "#FF5252" }))
 
-        // Click para ver detalles
         holder.itemView.setOnClickListener {
             val ctx = holder.itemView.context
             ctx.startActivity(Intent(ctx, DetalleMovimientoActivity::class.java).apply {
@@ -66,23 +67,19 @@ class MovimientoAdapter(
                 putExtra("subcategoria", m.subcategoria)
                 putExtra("detalle",      m.detalle)
                 putExtra("valor",        m.valor)
-                putExtra("timestamp",    m.timestamp)
+                putExtra("timestamp",    fechaMs)
                 putExtra("cuenta",       m.cuenta)
                 putExtra("moneda",       m.moneda)
                 putExtra("cuentaOrigen", m.cuentaOrigen)
             })
         }
 
-        // Botón eliminar
         holder.btnEliminar.setOnClickListener {
-            val ctx = holder.itemView.context
-            mostrarDialogoEliminar(ctx, m, position)
+            mostrarDialogoEliminar(holder.itemView.context, m)
         }
     }
 
-    private fun mostrarDialogoEliminar(
-        ctx: android.content.Context, m: Movimiento, position: Int
-    ) {
+    private fun mostrarDialogoEliminar(ctx: android.content.Context, m: Movimiento) {
         val tipo  = m.tipoTransaccion
         val emoji = when (tipo) { "Ingreso" -> "📈"; "Transferencia" -> "🔄"; else -> "📉" }
         val color = when (tipo) { "Ingreso" -> "#69F0AE"; "Transferencia" -> "#2196F3"; else -> "#FF5252" }
@@ -92,32 +89,27 @@ class MovimientoAdapter(
             setBackgroundColor(Color.parseColor("#111E2E"))
             setPadding(dp(ctx,24), dp(ctx,24), dp(ctx,24), dp(ctx,20))
         }
-
         raiz.addView(TextView(ctx).apply {
             text = "🗑️"; textSize = 36f; gravity = android.view.Gravity.CENTER
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(0,0,0,dp(ctx,8)) }
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,8)) }
         })
         raiz.addView(TextView(ctx).apply {
-            text = "Eliminar registro"; textSize = 18f
-            gravity = android.view.Gravity.CENTER
+            text = "Eliminar registro"; textSize = 18f; gravity = android.view.Gravity.CENTER
             setTextColor(Color.parseColor("#FF5252"))
             setTypeface(typeface, android.graphics.Typeface.BOLD)
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(0,0,0,dp(ctx,4)) }
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,4)) }
         })
         raiz.addView(TextView(ctx).apply {
-            text = "$emoji  $tipo  •  ${formatValor(m.valor, m.moneda)}"
+            text = "$emoji  $tipo  •  ${fmt(m.valor, m.moneda)}"
             textSize = 15f; gravity = android.view.Gravity.CENTER
             setTextColor(Color.parseColor(color))
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(0,0,0,dp(ctx,6)) }
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,6)) }
         })
         raiz.addView(TextView(ctx).apply {
             text = "Esta acción no se puede deshacer"
@@ -125,14 +117,11 @@ class MovimientoAdapter(
             setTextColor(Color.parseColor("#445566"))
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(0,0,0,dp(ctx,16)) }
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,16)) }
         })
-
         raiz.addView(View(ctx).apply {
             layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
-                setMargins(0,0,0,dp(ctx,16)) }
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1).apply { setMargins(0,0,0,dp(ctx,16)) }
             setBackgroundColor(Color.parseColor("#1E3A4A"))
         })
 
@@ -140,8 +129,7 @@ class MovimientoAdapter(
             orientation = android.widget.LinearLayout.HORIZONTAL
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT)
-        }
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT) }
 
         val dialog = AlertDialog.Builder(ctx).setView(raiz).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
@@ -149,41 +137,32 @@ class MovimientoAdapter(
         filaBtns.addView(Button(ctx).apply {
             text = "Cancelar"; isAllCaps = false; textSize = 14f
             setTextColor(Color.parseColor("#445566"))
-            backgroundTintList = android.content.res.ColorStateList.valueOf(
-                Color.parseColor("#0D1A2A"))
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                setMargins(0,0,dp(ctx,8),0) }
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#0D1A2A"))
+            layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0,0,dp(ctx,8),0) }
             setOnClickListener { dialog.dismiss() }
         })
         filaBtns.addView(Button(ctx).apply {
-            text = "🗑 Eliminar"; isAllCaps = false; textSize = 14f
-            setTextColor(Color.WHITE)
-            backgroundTintList = android.content.res.ColorStateList.valueOf(
-                Color.parseColor("#C62828"))
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            text = "🗑 Eliminar"; isAllCaps = false; textSize = 14f; setTextColor(Color.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C62828"))
+            layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             setOnClickListener {
                 dialog.dismiss()
-                eliminarMovimiento(m, position)
+                val uid = auth.currentUser?.uid ?: return@setOnClickListener
+                if (m.id.isEmpty()) return@setOnClickListener
+                db.child("movimientos").child(uid).child(m.id).removeValue()
+                    .addOnSuccessListener {
+                        val pos = lista.indexOfFirst { it.id == m.id }
+                        if (pos >= 0) { lista.removeAt(pos); notifyItemRemoved(pos) }
+                    }
             }
         })
         raiz.addView(filaBtns)
         dialog.show()
         dialog.window?.let {
             val w = (ctx.resources.displayMetrics.widthPixels * 0.85).toInt()
-            it.setLayout(w, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT)
-        }
-    }
-
-    private fun eliminarMovimiento(m: Movimiento, position: Int) {
-        val uid = auth.currentUser?.uid ?: return
-        if (m.id.isEmpty()) return
-        db.child("movimientos").child(uid).child(m.id).removeValue()
-            .addOnSuccessListener {
-                val pos = lista.indexOfFirst { it.id == m.id }
-                if (pos >= 0) { lista.removeAt(pos); notifyItemRemoved(pos) }
-            }
+            it.setLayout(w, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT) }
     }
 
     override fun getItemCount() = lista.size
@@ -191,7 +170,7 @@ class MovimientoAdapter(
     private fun dp(ctx: android.content.Context, dp: Int) =
         (dp * ctx.resources.displayMetrics.density).toInt()
 
-    private fun formatValor(valor: Double, moneda: String): String {
+    private fun fmt(valor: Double, moneda: String): String {
         return if (moneda == "USD") {
             val f = NumberFormat.getNumberInstance(Locale.US).apply {
                 maximumFractionDigits = 2; minimumFractionDigits = 0 }

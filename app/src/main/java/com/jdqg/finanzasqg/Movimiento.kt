@@ -13,5 +13,6 @@ data class Movimiento(
     var moneda: String = "COP",
     var cuentaOrigen: String = "",
     var cuentaDestino: String = "",
-    var fechaTransaccion: String = ""
+    var fechaTransaccion: String = "",
+    var fechaPersonalizada: Long = 0L  // timestamp de la fecha elegida por usuario
 )
