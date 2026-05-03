@@ -45,18 +45,8 @@ class Login : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
         val prefs    = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val recordar = prefs.getBoolean(KEY_REC, false)
-
-        // ── RECORDAR SESIÓN — verificar si el usuario sigue autenticado ──────
-        // Solo ir a Main si: recordar está activado Y hay usuario activo en Firebase Auth
-        if (recordar && auth.currentUser != null) {
-            irAMain()
-            return
-        }
-
-        // Si no recordar, cerrar sesión de Firebase para forzar login
-        if (!recordar) {
-            auth.signOut()
-        }
+        if (recordar && auth.currentUser != null) { irAMain(); return }
+        if (!recordar) auth.signOut()
 
         setContentView(R.layout.activity_login)
 
@@ -69,16 +59,14 @@ class Login : AppCompatActivity() {
         checkRecordar = findViewById(R.id.checkRecordar)
         btnVerPass    = findViewById(R.id.btnVerContrasena)
 
-        // Google Sign-In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
         googleClient = GoogleSignIn.getClient(this, gso)
 
-        // Precargar email guardado
-        val emailGuardado = prefs.getString(KEY_EMAIL, "") ?: ""
-        if (emailGuardado.isNotEmpty()) {
+        val emailGuardado = prefs.getString(KEY_EMAIL, "")
+        if (!emailGuardado.isNullOrEmpty()) {
             etEmail.setText(emailGuardado)
             checkRecordar.isChecked = recordar
         }
@@ -87,8 +75,7 @@ class Login : AppCompatActivity() {
             mostrandoPass = !mostrandoPass
             etContrasena.inputType = if (mostrandoPass)
                 InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-            else
-                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            else InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             etContrasena.setSelection(etContrasena.text.length)
         }
 
@@ -114,7 +101,6 @@ class Login : AppCompatActivity() {
         btnRegistrar.setOnClickListener {
             startActivity(Intent(this, SignUp::class.java))
         }
-
         tvOlvide.setOnClickListener { mostrarDialogoRecuperacion() }
     }
 
@@ -123,22 +109,18 @@ class Login : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == RC_GOOGLE) {
             try {
-                val account = GoogleSignIn
-                    .getSignedInAccountFromIntent(data)
+                val account    = GoogleSignIn.getSignedInAccountFromIntent(data)
                     .getResult(ApiException::class.java)
                 val credential = GoogleAuthProvider.getCredential(account.idToken, null)
                 auth.signInWithCredential(credential)
                     .addOnCompleteListener(this) { task ->
                         if (task.isSuccessful) {
                             val user = auth.currentUser ?: return@addOnCompleteListener
-                            // Guardar recordar sesión para Google
-                            getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
-                                putBoolean(KEY_REC, true)
-                                putString(KEY_EMAIL, user.email ?: "")
-                                apply()
-                            }
-                            manejarLoginSocial(user.uid, user.email ?: "",
-                                user.displayName ?: "")
+                            manejarLoginGoogle(
+                                uid    = user.uid,
+                                email  = user.email ?: "",
+                                nombre = user.displayName ?: ""
+                            )
                         } else {
                             Toast.makeText(this,
                                 "Error: ${task.exception?.message}",
@@ -153,25 +135,108 @@ class Login : AppCompatActivity() {
         }
     }
 
-    private fun manejarLoginSocial(uid: String, email: String, nombre: String) {
+    // ── Manejo Google — crea configuración por defecto si no existe ────────────
+    private fun manejarLoginGoogle(uid: String, email: String, nombre: String) {
         db.child("users").child(uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snap: DataSnapshot) {
-                    if (!snap.exists()) {
+                override fun onDataChange(snapUser: DataSnapshot) {
+
+                    val nombreFinal = nombre.ifEmpty { email.substringBefore("@") }
+
+                    if (!snapUser.exists()) {
+                        // Usuario completamente nuevo con Google
                         db.child("users").child(uid).setValue(mapOf(
-                            "name"      to nombre.ifEmpty { email.substringBefore("@") },
+                            "name"      to nombreFinal,
                             "email"     to email,
                             "uid"       to uid,
                             "isNewUser" to true
-                        )).addOnSuccessListener { irAOnboarding() }
+                        ))
+                        // Crear configuración por defecto para que no crashee
+                        crearConfiguracionPorDefecto(uid) {
+                            irAOnboarding()
+                        }
                     } else {
-                        val isNew = snap.child("isNewUser")
-                            .getValue(Boolean::class.java) ?: false
-                        if (isNew) irAOnboarding() else irAMain()
+                        // Usuario ya existe — verificar si tiene configuración
+                        db.child("configuracion").child(uid)
+                            .addListenerForSingleValueEvent(object : ValueEventListener {
+                                override fun onDataChange(snapCfg: DataSnapshot) {
+                                    if (!snapCfg.exists() || !snapCfg.hasChild("egresos")) {
+                                        // Tiene cuenta pero no tiene configuración
+                                        crearConfiguracionPorDefecto(uid) {
+                                            val isNew = snapUser.child("isNewUser")
+                                                .getValue(Boolean::class.java) ?: false
+                                            if (isNew) irAOnboarding() else irAMain()
+                                        }
+                                    } else {
+                                        val isNew = snapUser.child("isNewUser")
+                                            .getValue(Boolean::class.java) ?: false
+                                        if (isNew) irAOnboarding() else irAMain()
+                                    }
+                                }
+                                override fun onCancelled(e: DatabaseError) { irAMain() }
+                            })
                     }
                 }
                 override fun onCancelled(e: DatabaseError) { irAMain() }
             })
+    }
+
+    // ── Crear configuración por defecto en Firebase ────────────────────────────
+    private fun crearConfiguracionPorDefecto(uid: String, onDone: () -> Unit) {
+        val egresosDefault = listOf(
+            mapOf("nombre" to "Comida", "subcategorias" to listOf(
+                mapOf("nombre" to "Almuerzo",  "subsubcategorias" to listOf("Restaurante","Casa","Delivery")),
+                mapOf("nombre" to "Mercado",   "subsubcategorias" to listOf("Supermercado","Tienda")),
+                mapOf("nombre" to "Cafetería", "subsubcategorias" to listOf("Café","Snack")))),
+            mapOf("nombre" to "Casa", "subcategorias" to listOf(
+                mapOf("nombre" to "Servicios", "subsubcategorias" to listOf("Luz","Agua","Gas","Internet")),
+                mapOf("nombre" to "Arriendo",  "subsubcategorias" to emptyList<String>()),
+                mapOf("nombre" to "Mercado",   "subsubcategorias" to emptyList<String>()))),
+            mapOf("nombre" to "Transporte", "subcategorias" to listOf(
+                mapOf("nombre" to "Gasolina",          "subsubcategorias" to listOf("Carro","Moto")),
+                mapOf("nombre" to "Transporte público", "subsubcategorias" to listOf("Bus","Metro")),
+                mapOf("nombre" to "Taxi/Uber",          "subsubcategorias" to emptyList<String>()))),
+            mapOf("nombre" to "Salud", "subcategorias" to listOf(
+                mapOf("nombre" to "Medicamentos","subsubcategorias" to emptyList<String>()),
+                mapOf("nombre" to "Consulta",    "subsubcategorias" to listOf("Médico","Odontólogo")),
+                mapOf("nombre" to "Gym",         "subsubcategorias" to emptyList<String>()))),
+            mapOf("nombre" to "Familia", "subcategorias" to listOf(
+                mapOf("nombre" to "Mesada",  "subsubcategorias" to emptyList<String>()),
+                mapOf("nombre" to "Salidas", "subsubcategorias" to listOf("Restaurante","Cine")),
+                mapOf("nombre" to "Mascotas","subsubcategorias" to listOf("Veterinario","Comida")))),
+            mapOf("nombre" to "Ocio", "subcategorias" to listOf(
+                mapOf("nombre" to "Entretenimiento","subsubcategorias" to listOf("Streaming","Juegos")),
+                mapOf("nombre" to "Viajes",         "subsubcategorias" to listOf("Tiquetes","Hotel")),
+                mapOf("nombre" to "Ropa",           "subsubcategorias" to emptyList<String>())))
+        )
+
+        val ingresosDefault = listOf(
+            mapOf("nombre" to "Salario", "subcategorias" to listOf(
+                mapOf("nombre" to "Nómina","subsubcategorias" to listOf("Quincenal","Mensual")),
+                mapOf("nombre" to "Prima", "subsubcategorias" to emptyList<String>()))),
+            mapOf("nombre" to "Negocio", "subcategorias" to listOf(
+                mapOf("nombre" to "Ventas",   "subsubcategorias" to emptyList<String>()),
+                mapOf("nombre" to "Servicios","subsubcategorias" to emptyList<String>()))),
+            mapOf("nombre" to "Inmuebles", "subcategorias" to listOf(
+                mapOf("nombre" to "Arriendo","subsubcategorias" to emptyList<String>()),
+                mapOf("nombre" to "Venta",   "subsubcategorias" to emptyList<String>()))),
+            mapOf("nombre" to "Otros", "subcategorias" to listOf(
+                mapOf("nombre" to "Regalo",  "subsubcategorias" to emptyList<String>()),
+                mapOf("nombre" to "Premio",  "subsubcategorias" to emptyList<String>()),
+                mapOf("nombre" to "Préstamo","subsubcategorias" to emptyList<String>())))
+        )
+
+        val cuentasDefault = listOf(
+            "Bancolombia","Nu","Nequi","Efectivo","Tarjeta crédito")
+
+        val config = mapOf(
+            "egresos"  to egresosDefault,
+            "ingresos" to ingresosDefault,
+            "cuentas"  to cuentasDefault
+        )
+
+        db.child("configuracion").child(uid).setValue(config)
+            .addOnCompleteListener { onDone() }
     }
 
     private fun intentarHuella() {
@@ -191,13 +256,12 @@ class Login : AppCompatActivity() {
                         "Huella no reconocida", Toast.LENGTH_SHORT).show()
                 }
             }
-            val prompt = BiometricPrompt(this, executor, callback)
-            val info = BiometricPrompt.PromptInfo.Builder()
-                .setTitle("FinanzasQG")
-                .setSubtitle("Usa tu huella para ingresar")
-                .setNegativeButtonText("Usar contraseña")
-                .build()
-            prompt.authenticate(info)
+            BiometricPrompt(this, executor, callback).authenticate(
+                BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("FinanzasQG")
+                    .setSubtitle("Usa tu huella para ingresar")
+                    .setNegativeButtonText("Usar contraseña")
+                    .build())
         } catch (e: Exception) { /* sin huella */ }
     }
 
@@ -209,14 +273,13 @@ class Login : AppCompatActivity() {
                 for (child in snap.children) {
                     val name = child.child("name").getValue(String::class.java) ?: ""
                     if (name.lowercase() == nombre.lowercase()) {
-                        found = child.child("email").getValue(String::class.java)
-                        break
-                    }
+                        found = child.child("email").getValue(String::class.java); break }
                 }
                 if (found != null) loginConEmail(found, pass)
                 else {
                     btnIngresar.isEnabled = true; btnIngresar.text = "INGRESAR"
-                    Toast.makeText(this@Login, "Usuario no encontrado", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@Login,
+                        "Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
             }
             override fun onCancelled(e: DatabaseError) {
@@ -232,21 +295,40 @@ class Login : AppCompatActivity() {
                 btnIngresar.isEnabled = true; btnIngresar.text = "INGRESAR"
                 if (task.isSuccessful) {
                     val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    // Guardar preferencia de recordar
                     prefs.edit().apply {
                         putBoolean(KEY_REC, checkRecordar.isChecked)
                         if (checkRecordar.isChecked) putString(KEY_EMAIL, correo)
                         else remove(KEY_EMAIL)
                         apply()
                     }
-
                     val uid = auth.currentUser?.uid ?: ""
-                    db.child("users").child(uid)
+                    // Verificar si tiene configuración
+                    db.child("configuracion").child(uid)
                         .addListenerForSingleValueEvent(object : ValueEventListener {
-                            override fun onDataChange(snap: DataSnapshot) {
-                                val isNew = snap.child("isNewUser")
-                                    .getValue(Boolean::class.java) ?: false
-                                if (isNew) irAOnboarding() else irAMain()
+                            override fun onDataChange(snapCfg: DataSnapshot) {
+                                if (!snapCfg.exists() || !snapCfg.hasChild("egresos")) {
+                                    crearConfiguracionPorDefecto(uid) {
+                                        db.child("users").child(uid)
+                                            .addListenerForSingleValueEvent(object : ValueEventListener {
+                                                override fun onDataChange(snapU: DataSnapshot) {
+                                                    val isNew = snapU.child("isNewUser")
+                                                        .getValue(Boolean::class.java) ?: false
+                                                    if (isNew) irAOnboarding() else irAMain()
+                                                }
+                                                override fun onCancelled(e: DatabaseError) { irAMain() }
+                                            })
+                                    }
+                                } else {
+                                    db.child("users").child(uid)
+                                        .addListenerForSingleValueEvent(object : ValueEventListener {
+                                            override fun onDataChange(snapU: DataSnapshot) {
+                                                val isNew = snapU.child("isNewUser")
+                                                    .getValue(Boolean::class.java) ?: false
+                                                if (isNew) irAOnboarding() else irAMain()
+                                            }
+                                            override fun onCancelled(e: DatabaseError) { irAMain() }
+                                        })
+                                }
                             }
                             override fun onCancelled(e: DatabaseError) { irAMain() }
                         })
@@ -258,15 +340,13 @@ class Login : AppCompatActivity() {
 
     private fun irAMain() {
         startActivity(Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        })
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK })
         finish()
     }
 
     private fun irAOnboarding() {
         startActivity(Intent(this, OnboardingActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        })
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK })
         finish()
     }
 
@@ -283,8 +363,7 @@ class Login : AppCompatActivity() {
         val etEmailRec = vista.findViewById<EditText>(R.id.etEmailRecuperar)
         vista.findViewById<Button>(R.id.btnEnviarRecuperar).setOnClickListener {
             val correo = etEmailRec.text.toString().trim()
-            if (correo.isEmpty()) {
-                etEmailRec.error = "Ingresa tu correo"; return@setOnClickListener }
+            if (correo.isEmpty()) { etEmailRec.error = "Ingresa tu correo"; return@setOnClickListener }
             auth.sendPasswordResetEmail(correo)
                 .addOnSuccessListener {
                     Toast.makeText(this, "Enlace enviado ✅", Toast.LENGTH_LONG).show()
