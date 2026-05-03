@@ -35,11 +35,12 @@ class SetupCategoriasActivity : AppCompatActivity() {
     private val ingresosTree = mutableListOf<CategoriaSetup>()
     private val cuentas      = mutableListOf<String>()
 
-    // Mapa plano: clave "Cat > Sub > SubSub" → valores
-    // Solo se editan las hojas; los totales se calculan
     private val presupuestosHoja = mutableMapOf<String, MutableMap<String, Double>>()
+
+    // presupuestoMax: puede ser manual (si el usuario lo editó) o automático (suma categorías)
     private var presupuestoMaxCOP = 0.0
     private var presupuestoMaxUSD = 0.0
+    private var presupuestoManual = false  // true si el usuario lo escribió manualmente
 
     private lateinit var btnEgresos     : Button
     private lateinit var btnIngresos    : Button
@@ -48,9 +49,11 @@ class SetupCategoriasActivity : AppCompatActivity() {
     private lateinit var container      : LinearLayout
     private lateinit var btnGuardar     : Button
 
-    // Referencias a TextViews de totales para actualizar sin re-renderizar
-    private val tvTotalesCat = mutableMapOf<String, TextView>()
-    private val tvTotalesSub = mutableMapOf<String, TextView>()
+    // Referencias para actualizar totales en pantalla sin re-renderizar
+    private val tvTotalesCat     = mutableMapOf<String, TextView>()
+    private val tvTotalesSub     = mutableMapOf<String, TextView>()
+    private var tvPresupGenCOP   : TextView? = null
+    private var tvPresupGenUSD   : TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -100,7 +103,8 @@ class SetupCategoriasActivity : AppCompatActivity() {
                     for (c in snap.child("cuentas").children)
                         c.getValue(String::class.java)?.let { cuentas.add(it) }
                     if (cuentas.isEmpty())
-                        cuentas.addAll(listOf("Bancolombia","Nu","Nequi","Efectivo","Tarjeta crédito"))
+                        cuentas.addAll(listOf("Bancolombia","Nu","Nequi",
+                            "Efectivo","Tarjeta crédito"))
 
                     presupuestoMaxCOP = snap.child("presupuestoMax")
                         .child("max_COP").getValue(Double::class.java) ?: 0.0
@@ -115,8 +119,10 @@ class SetupCategoriasActivity : AppCompatActivity() {
                         val clave = s.key ?: continue
                         if (!clave.contains(" > ")) continue
                         val m = mutableMapOf<String, Double>()
-                        m["max_COP"] = s.child("max_COP").getValue(Double::class.java) ?: 0.0
-                        m["max_USD"] = s.child("max_USD").getValue(Double::class.java) ?: 0.0
+                        m["max_COP"] = s.child("max_COP")
+                            .getValue(Double::class.java) ?: 0.0
+                        m["max_USD"] = s.child("max_USD")
+                            .getValue(Double::class.java) ?: 0.0
                         presupuestosHoja[clave] = m
                     }
 
@@ -142,6 +148,11 @@ class SetupCategoriasActivity : AppCompatActivity() {
             .sumOf { it.value["max_$moneda"] ?: 0.0 }
     }
 
+    // Suma TODAS las categorías para obtener el total general
+    private fun totalGeneral(moneda: String): Double {
+        return egresosTree.sumOf { cat -> totalCategoria(cat.nombre, moneda) }
+    }
+
     private fun textoTotal(cop: Double, usd: Double): String {
         val parts = mutableListOf<String>()
         if (cop > 0) parts.add("$${fmtNum(cop.toLong())}")
@@ -149,8 +160,9 @@ class SetupCategoriasActivity : AppCompatActivity() {
         return parts.joinToString(" | ")
     }
 
-    // Actualiza los textos de totales en pantalla SIN re-renderizar
+    // Actualiza totales en pantalla sin re-renderizar
     private fun actualizarTotalesEnPantalla() {
+        // Totales de subcategorías
         egresosTree.forEach { cat ->
             val totCatCOP = totalCategoria(cat.nombre, "COP")
             val totCatUSD = totalCategoria(cat.nombre, "USD")
@@ -163,12 +175,21 @@ class SetupCategoriasActivity : AppCompatActivity() {
                     textoTotal(totSubCOP, totSubUSD)
             }
         }
+
+        // Actualizar presupuesto general automático (suma de todas las categorías)
+        if (!presupuestoManual) {
+            val genCOP = totalGeneral("COP")
+            val genUSD = totalGeneral("USD")
+            if (genCOP > 0) tvPresupGenCOP?.text = fmtNum(genCOP.toLong())
+            if (genUSD > 0) tvPresupGenUSD?.text = genUSD.toString()
+        }
     }
 
     private fun cargarDefaults() {
         cargarEgresosDefault(); cargarIngresosDefault()
         if (cuentas.isEmpty())
-            cuentas.addAll(listOf("Bancolombia","Nu","Nequi","Efectivo","Tarjeta crédito"))
+            cuentas.addAll(listOf("Bancolombia","Nu","Nequi",
+                "Efectivo","Tarjeta crédito"))
     }
 
     private fun cargarEgresosDefault() {
@@ -241,13 +262,14 @@ class SetupCategoriasActivity : AppCompatActivity() {
                 val on = s == seccion
                 btn.backgroundTintList = android.content.res.ColorStateList.valueOf(
                     if (on) Color.parseColor("#4CAF50") else Color.parseColor("#0D1A2A"))
-                btn.setTextColor(if (on) Color.parseColor("#0A1628") else Color.parseColor("#4CAF50"))
+                btn.setTextColor(
+                    if (on) Color.parseColor("#0A1628") else Color.parseColor("#4CAF50"))
             }
     }
 
     private fun renderizar() {
-        tvTotalesCat.clear()
-        tvTotalesSub.clear()
+        tvTotalesCat.clear(); tvTotalesSub.clear()
+        tvPresupGenCOP = null; tvPresupGenUSD = null
         container.removeAllViews()
         when (seccion) {
             "egresos"     -> renderArbol(egresosTree)
@@ -261,14 +283,12 @@ class SetupCategoriasActivity : AppCompatActivity() {
     private fun renderArbol(arbol: MutableList<CategoriaSetup>) {
         container.addView(botonAccion("＋  Agregar categoría") {
             arbol.add(CategoriaSetup("Nueva categoría")); renderizar() })
-
         arbol.forEachIndexed { catIdx, cat ->
             val card = card()
             val fC = filaH()
             fC.addView(inputTexto(cat.nombre, true) { cat.nombre = it })
             fC.addView(botonElim { arbol.removeAt(catIdx); renderizar() })
             card.addView(fC)
-
             cat.subcategorias.forEachIndexed { subIdx, sub ->
                 card.addView(divider())
                 val fS = filaH(dpToPx(16))
@@ -276,7 +296,6 @@ class SetupCategoriasActivity : AppCompatActivity() {
                 fS.addView(inputTexto(sub.nombre, false) { sub.nombre = it })
                 fS.addView(botonX { cat.subcategorias.removeAt(subIdx); renderizar() })
                 card.addView(fS)
-
                 sub.subsubcategorias.forEachIndexed { ssIdx, ss ->
                     val fSS = filaH(dpToPx(32))
                     fSS.addView(tvArrow("»"))
@@ -286,7 +305,9 @@ class SetupCategoriasActivity : AppCompatActivity() {
                 }
                 card.addView(linkBtn("  ＋ sub-sub") {
                     sub.subsubcategorias.add("Nueva"); renderizar()
-                }.apply { (layoutParams as LinearLayout.LayoutParams).setMargins(dpToPx(32),0,0,0) })
+                }.apply {
+                    (layoutParams as LinearLayout.LayoutParams)
+                        .setMargins(dpToPx(32), 0, 0, 0) })
             }
             card.addView(linkBtn("  ＋ subcategoría") {
                 cat.subcategorias.add(SubcategoriaSetup("Nueva subcategoría")); renderizar() })
@@ -296,7 +317,8 @@ class SetupCategoriasActivity : AppCompatActivity() {
 
     // ── CUENTAS ───────────────────────────────────────────────────────────────
     private fun renderCuentas() {
-        container.addView(botonAccion("＋  Agregar cuenta") { cuentas.add("Nueva cuenta"); renderizar() })
+        container.addView(botonAccion("＋  Agregar cuenta") {
+            cuentas.add("Nueva cuenta"); renderizar() })
         cuentas.forEachIndexed { idx, cuenta ->
             val card = card(); val row = filaH()
             row.addView(inputTexto(cuenta, true) { cuentas[idx] = it })
@@ -305,40 +327,79 @@ class SetupCategoriasActivity : AppCompatActivity() {
         }
     }
 
-    // ── PRESUPUESTO — campos de hoja SIN re-renderizar al escribir ─────────────
+    // ── PRESUPUESTO ────────────────────────────────────────────────────────────
     private fun renderPresupuesto() {
-        // General
+        val totalAutoCOP = totalGeneral("COP")
+        val totalAutoUSD = totalGeneral("USD")
+
+        // Si el usuario no ha modificado manualmente, usar el total automático
+        val copMostrar = if (presupuestoManual || presupuestoMaxCOP > 0)
+            presupuestoMaxCOP else totalAutoCOP
+        val usdMostrar = if (presupuestoManual || presupuestoMaxUSD > 0)
+            presupuestoMaxUSD else totalAutoUSD
+
+        // Card presupuesto general
         val cardGen = card()
         cardGen.addView(tvSeccion("💳  Presupuesto mensual total"))
-        cardGen.addView(tvHint("Máximo que quieres gastar al mes"))
-        cardGen.addView(tvLabel("COP ($)"))
-        cardGen.addView(etPresupuestoLibre(
-            presupuestoMaxCOP, "Máx. COP"
-        ) { presupuestoMaxCOP = it })
+
+        // Indicador de cálculo automático
+        val labelAuto = if (!presupuestoManual && (totalAutoCOP > 0 || totalAutoUSD > 0))
+            "Se calcula automáticamente sumando todas las categorías ↓"
+        else "¿Cuánto quieres gastar en total al mes?"
+        cardGen.addView(tvHint(labelAuto))
+
+        cardGen.addView(tvLabel("COP  ($)"))
+
+        // Campo COP general — guarda referencia para actualizar automáticamente
+        val etGenCOP = etPresupuestoLibre(
+            copMostrar, "Auto: ${fmtNum(totalAutoCOP.toLong())}"
+        ) { v ->
+            presupuestoMaxCOP = v
+            presupuestoManual = v > 0
+        }
+        tvPresupGenCOP = etGenCOP   // guardar referencia
+        cardGen.addView(etGenCOP)
+
         cardGen.addView(tvLabel("USD"))
-        cardGen.addView(etPresupuestoLibre(
-            presupuestoMaxUSD, "Máx. USD", decimal = true
-        ) { presupuestoMaxUSD = it })
+        val etGenUSD = etPresupuestoLibre(
+            usdMostrar, "Auto: ${if (totalAutoUSD > 0) totalAutoUSD else 0}", decimal = true
+        ) { v ->
+            presupuestoMaxUSD = v
+            presupuestoManual = v > 0
+        }
+        tvPresupGenUSD = etGenUSD
+        cardGen.addView(etGenUSD)
+
+        if (!presupuestoManual && (totalAutoCOP > 0 || totalAutoUSD > 0)) {
+            cardGen.addView(TextView(this).apply {
+                text = "✅ Total actual: ${textoTotal(totalAutoCOP, totalAutoUSD)}"
+                setTextColor(Color.parseColor("#4CAF50"))
+                textSize = 13f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    setMargins(0, dpToPx(6), 0, 0) }
+            })
+        }
         container.addView(cardGen)
 
-        // Por categoría
+        // Card presupuesto por categoría
         val cardCat = card()
         cardCat.addView(tvSeccion("🎯  Presupuesto por categoría"))
-        cardCat.addView(tvHint("Solo edita las hojas (📌). Los totales se suman automáticamente ↑"))
+        cardCat.addView(tvHint("Edita las hojas (📌). Los totales suben automáticamente ↑"))
 
         egresosTree.forEach { cat ->
             cardCat.addView(divider())
 
-            // Cabecera categoría — total calculado en tiempo real
             val tvTotCat = TextView(this).apply {
                 text = textoTotal(
-                    totalCategoria(cat.nombre,"COP"),
-                    totalCategoria(cat.nombre,"USD"))
-                setTextColor(Color.parseColor("#4CAF50"))
-                textSize = 11f
+                    totalCategoria(cat.nombre, "COP"),
+                    totalCategoria(cat.nombre, "USD"))
+                setTextColor(Color.parseColor("#4CAF50")); textSize = 11f
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
             }
-            tvTotalesCat[cat.nombre] = tvTotCat   // guardar referencia
+            tvTotalesCat[cat.nombre] = tvTotCat
 
             val fCat = filaH()
             fCat.addView(TextView(this).apply {
@@ -352,13 +413,11 @@ class SetupCategoriasActivity : AppCompatActivity() {
             cardCat.addView(fCat)
 
             cat.subcategorias.forEach { sub ->
-                // Cabecera subcategoría — total calculado
                 val tvTotSub = TextView(this).apply {
                     text = textoTotal(
-                        totalSubcategoria(cat.nombre, sub.nombre,"COP"),
-                        totalSubcategoria(cat.nombre, sub.nombre,"USD"))
-                    setTextColor(Color.parseColor("#69F0AE"))
-                    textSize = 10f
+                        totalSubcategoria(cat.nombre, sub.nombre, "COP"),
+                        totalSubcategoria(cat.nombre, sub.nombre, "USD"))
+                    setTextColor(Color.parseColor("#69F0AE")); textSize = 10f
                 }
                 tvTotalesSub["${cat.nombre}|${sub.nombre}"] = tvTotSub
 
@@ -374,7 +433,6 @@ class SetupCategoriasActivity : AppCompatActivity() {
                 cardCat.addView(fSub)
 
                 if (sub.subsubcategorias.isNotEmpty()) {
-                    // HOJAS = subsubcategorías
                     sub.subsubcategorias.forEach { ss ->
                         val clave = "${cat.nombre} > ${sub.nombre} > $ss"
                         val maxSS = presupuestosHoja.getOrPut(clave) { mutableMapOf() }
@@ -390,12 +448,15 @@ class SetupCategoriasActivity : AppCompatActivity() {
 
                         val rCOP = filaH(dpToPx(32))
                         rCOP.addView(tvMonedaLabel("COP","#4CAF50"))
-                        // ── FIX: etPresupuestoLibre NUNCA llama renderizar() ──
                         rCOP.addView(etPresupuestoLibre(
                             maxSS["max_COP"] ?: 0.0, "0"
                         ) { v ->
                             maxSS["max_COP"] = v
-                            actualizarTotalesEnPantalla()   // solo actualiza textos
+                            // Si no hay presupuesto manual general, actualizar general también
+                            if (!presupuestoManual) {
+                                presupuestoMaxCOP = totalGeneral("COP")
+                            }
+                            actualizarTotalesEnPantalla()
                         })
                         cardCat.addView(rCOP)
 
@@ -405,12 +466,14 @@ class SetupCategoriasActivity : AppCompatActivity() {
                             maxSS["max_USD"] ?: 0.0, "0", decimal = true
                         ) { v ->
                             maxSS["max_USD"] = v
+                            if (!presupuestoManual) {
+                                presupuestoMaxUSD = totalGeneral("USD")
+                            }
                             actualizarTotalesEnPantalla()
                         })
                         cardCat.addView(rUSD)
                     }
                 } else {
-                    // HOJA = subcategoría sin hijos
                     val clave  = "${cat.nombre} > ${sub.nombre}"
                     val maxSub = presupuestosHoja.getOrPut(clave) { mutableMapOf() }
 
@@ -420,6 +483,9 @@ class SetupCategoriasActivity : AppCompatActivity() {
                         maxSub["max_COP"] ?: 0.0, "0"
                     ) { v ->
                         maxSub["max_COP"] = v
+                        if (!presupuestoManual) {
+                            presupuestoMaxCOP = totalGeneral("COP")
+                        }
                         actualizarTotalesEnPantalla()
                     })
                     cardCat.addView(rCOP)
@@ -430,6 +496,9 @@ class SetupCategoriasActivity : AppCompatActivity() {
                         maxSub["max_USD"] ?: 0.0, "0", decimal = true
                     ) { v ->
                         maxSub["max_USD"] = v
+                        if (!presupuestoManual) {
+                            presupuestoMaxUSD = totalGeneral("USD")
+                        }
                         actualizarTotalesEnPantalla()
                     })
                     cardCat.addView(rUSD)
@@ -439,16 +508,13 @@ class SetupCategoriasActivity : AppCompatActivity() {
         container.addView(cardCat)
     }
 
-    // ── etPresupuestoLibre — EL FIX PRINCIPAL ─────────────────────────────────
-    // No llama renderizar() ni setText() dentro del watcher.
-    // El cursor NUNCA se pierde porque no recreamos la vista.
+    // ── etPresupuestoLibre — nunca llama renderizar(), nunca pierde el cursor ──
     private fun etPresupuestoLibre(
         valorInicial: Double,
         hintText: String,
         decimal: Boolean = false,
         onChange: (Double) -> Unit
     ) = EditText(this).apply {
-        // Mostrar valor inicial solo si > 0
         if (valorInicial > 0) {
             setText(if (decimal) valorInicial.toString()
             else fmtNum(valorInicial.toLong()))
@@ -460,7 +526,6 @@ class SetupCategoriasActivity : AppCompatActivity() {
         inputType = if (decimal)
             InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
         else InputType.TYPE_CLASS_NUMBER
-        background = null
         setBackgroundResource(R.drawable.finanzas_input_bg)
         setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
         layoutParams = LinearLayout.LayoutParams(
@@ -469,14 +534,10 @@ class SetupCategoriasActivity : AppCompatActivity() {
 
         addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                // ─── CRÍTICO: solo leer valor, NUNCA setText() ni renderizar() ───
-                val raw = s?.toString()?.trim() ?: ""
-                val valor = if (decimal) {
-                    raw.toDoubleOrNull() ?: 0.0
-                } else {
-                    // Soportar números con puntos de miles (ej: "1.000.000")
-                    raw.replace(".", "").replace(",", "").toLongOrNull()?.toDouble() ?: 0.0
-                }
+                val raw   = s?.toString()?.trim() ?: ""
+                val valor = if (decimal) raw.toDoubleOrNull() ?: 0.0
+                else raw.replace(".", "").replace(",","")
+                    .toLongOrNull()?.toDouble() ?: 0.0
                 onChange(valor)
             }
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
@@ -491,12 +552,18 @@ class SetupCategoriasActivity : AppCompatActivity() {
             Toast.makeText(this, "Debes iniciar sesión", Toast.LENGTH_SHORT).show()
             btnGuardar.isEnabled = true; btnGuardar.text = "GUARDAR Y CONTINUAR"; return }
 
+        // Si no hay presupuesto manual, el general = suma de categorías
+        val copFinal = if (presupuestoManual && presupuestoMaxCOP > 0)
+            presupuestoMaxCOP else totalGeneral("COP")
+        val usdFinal = if (presupuestoManual && presupuestoMaxUSD > 0)
+            presupuestoMaxUSD else totalGeneral("USD")
+
         val presupSer = presupuestosHoja
             .filter { (_, v) -> (v["max_COP"] ?: 0.0) > 0 || (v["max_USD"] ?: 0.0) > 0 }
-            .mapValues { (_, v) ->
-                mapOf("max_COP" to (v["max_COP"] ?: 0.0), "max_USD" to (v["max_USD"] ?: 0.0)) }
+            .mapValues { (_, v) -> mapOf(
+                "max_COP" to (v["max_COP"] ?: 0.0),
+                "max_USD" to (v["max_USD"] ?: 0.0)) }
 
-        // Agregar totales calculados
         val presupConTotales = presupSer.toMutableMap()
         egresosTree.forEach { cat ->
             val totCOP = totalCategoria(cat.nombre, "COP")
@@ -517,8 +584,10 @@ class SetupCategoriasActivity : AppCompatActivity() {
             "egresos"               to serArbol(egresosTree),
             "ingresos"              to serArbol(ingresosTree),
             "cuentas"               to cuentas,
+            // Presupuesto general = suma de categorías (o manual si el usuario lo modificó)
             "presupuestoMax"        to mapOf(
-                "max_COP" to presupuestoMaxCOP, "max_USD" to presupuestoMaxUSD),
+                "max_COP" to copFinal,
+                "max_USD" to usdFinal),
             "presupuestoCategorias" to presupConTotales,
             "maximosCategorias"     to presupConTotales
         )
@@ -570,7 +639,8 @@ class SetupCategoriasActivity : AppCompatActivity() {
         setPadding(dpToPx(16), dpToPx(14), dpToPx(16), dpToPx(14))
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dpToPx(12)) }
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            setMargins(0,0,0,dpToPx(12)) }
     }
 
     private fun filaH(marginStart: Int = 0) = LinearLayout(this).apply {
@@ -615,7 +685,9 @@ class SetupCategoriasActivity : AppCompatActivity() {
     private fun botonElim(onClick: () -> Unit) = Button(this).apply {
         text = "🗑"; textSize = 15f; isAllCaps = false
         background = android.graphics.drawable.GradientDrawable().apply {
-            setColor(Color.parseColor("#2A0A0A")); cornerRadius = dpToPx(10).toFloat() }
+            setColor(Color.parseColor("#2A0A0A"))
+            cornerRadius = dpToPx(10).toFloat()
+        }
         layoutParams = LinearLayout.LayoutParams(dpToPx(44), dpToPx(44)).apply {
             setMargins(dpToPx(8),0,0,0) }
         setOnClickListener { onClick() }
@@ -625,7 +697,9 @@ class SetupCategoriasActivity : AppCompatActivity() {
         text = "✕"; textSize = 11f; isAllCaps = false
         setTextColor(Color.parseColor("#FF5252"))
         background = android.graphics.drawable.GradientDrawable().apply {
-            setColor(Color.parseColor("#2A0A0A")); cornerRadius = dpToPx(8).toFloat() }
+            setColor(Color.parseColor("#2A0A0A"))
+            cornerRadius = dpToPx(8).toFloat()
+        }
         layoutParams = LinearLayout.LayoutParams(dpToPx(34), dpToPx(34)).apply {
             setMargins(dpToPx(4),0,0,0) }
         setOnClickListener { onClick() }
@@ -662,14 +736,16 @@ class SetupCategoriasActivity : AppCompatActivity() {
         setTypeface(typeface, android.graphics.Typeface.BOLD)
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dpToPx(4)) }
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            setMargins(0,0,0,dpToPx(4)) }
     }
 
     private fun tvHint(txt: String) = TextView(this).apply {
         text = txt; setTextColor(Color.parseColor("#3A5A6A")); textSize = 12f
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dpToPx(14)) }
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            setMargins(0,0,0,dpToPx(14)) }
     }
 
     private fun tvLabel(txt: String) = TextView(this).apply {
@@ -678,7 +754,8 @@ class SetupCategoriasActivity : AppCompatActivity() {
         letterSpacing = 0.08f
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,dpToPx(10),0,dpToPx(4)) }
+            LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            setMargins(0,dpToPx(10),0,dpToPx(4)) }
     }
 
     private fun fmtNum(n: Long): String {

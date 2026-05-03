@@ -1,5 +1,6 @@
 package com.jdqg.finanzasqg
 
+import android.app.DatePickerDialog
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
@@ -13,25 +14,25 @@ import androidx.fragment.app.Fragment
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import java.text.NumberFormat
-import java.util.Locale
+import java.text.SimpleDateFormat
+import java.util.*
 
 class RegistrarFragment : Fragment() {
 
     private val db   = FirebaseDatabase.getInstance().reference
     private val auth = FirebaseAuth.getInstance()
 
-    private val categoriasEgreso  = mutableListOf<String>()
-    private val categoriasIngreso = mutableListOf<String>()
+    private val categoriasEgreso     = mutableListOf<String>()
+    private val categoriasIngreso    = mutableListOf<String>()
     private val subcategoriasMap     = mutableMapOf<String, List<String>>()
     private val subsubcategoriasMap  = mutableMapOf<String, List<String>>()
     private val cuentas              = mutableListOf<String>()
     private val monedas              = listOf("COP", "USD")
 
-    private var tipoSeleccionado = "Egreso"
-    private var editandoValor    = false
-    private var configCargada    = false
-
-    private var rootView: View? = null
+    private var tipoSeleccionado  = "Egreso"
+    private var editandoValor     = false
+    private var fechaSeleccionada = Calendar.getInstance()
+    private var rootView: View?   = null
 
     private lateinit var btnEgreso        : Button
     private lateinit var btnIngreso       : Button
@@ -55,6 +56,8 @@ class RegistrarFragment : Fragment() {
     private lateinit var etValorTransf    : EditText
     private lateinit var tvMonedaBadge    : TextView
     private lateinit var btnGuardar       : Button
+    private lateinit var btnFecha         : Button
+    private lateinit var tvFechaSeleccionada : TextView
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -64,11 +67,33 @@ class RegistrarFragment : Fragment() {
         rootView = view
         bindViews(view)
         limpiar()
+        actualizarTextoFecha()
         cargarConfiguracion()
+
         btnEgreso.setOnClickListener        { actualizarTipo("Egreso") }
         btnIngreso.setOnClickListener       { actualizarTipo("Ingreso") }
         btnTransferencia.setOnClickListener { actualizarTipo("Transferencia") }
         btnGuardar.setOnClickListener       { confirmarYGuardar() }
+
+        btnFecha.setOnClickListener {
+            val cal = fechaSeleccionada
+            DatePickerDialog(
+                requireContext(),
+                { _, year, month, day ->
+                    fechaSeleccionada = Calendar.getInstance().apply {
+                        set(year, month, day,
+                            Calendar.getInstance().get(Calendar.HOUR_OF_DAY),
+                            Calendar.getInstance().get(Calendar.MINUTE),
+                            0)
+                    }
+                    actualizarTextoFecha()
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        }
+
         return view
     }
 
@@ -95,16 +120,28 @@ class RegistrarFragment : Fragment() {
         etValorTransf       = view.findViewById(R.id.etValorTransf)
         tvMonedaBadge       = view.findViewById(R.id.tvMonedaBadge)
         btnGuardar          = view.findViewById(R.id.btnGuardarMovimiento)
+        btnFecha            = view.findViewById(R.id.btnFecha)
+        tvFechaSeleccionada = view.findViewById(R.id.tvFechaSeleccionada)
+    }
+
+    private fun actualizarTextoFecha() {
+        val sdf  = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val hoy  = Calendar.getInstance()
+        val ayer = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+        val fechaStr = sdf.format(fechaSeleccionada.time)
+        val label = when (fechaStr) {
+            sdf.format(hoy.time)  -> "📅 Hoy — $fechaStr"
+            sdf.format(ayer.time) -> "📅 Ayer — $fechaStr"
+            else                  -> "📅 $fechaStr"
+        }
+        tvFechaSeleccionada.text = label
     }
 
     private fun cargarConfiguracion() {
-        val uid = auth.currentUser?.uid ?: run {
-            usarDefaults(); return }
-
+        val uid = auth.currentUser?.uid ?: run { usarDefaults(); return }
         db.child("configuracion").child(uid)
             .addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snap: DataSnapshot) {
-                    // Si no hay config aún, usar defaults mientras se crea
                     if (!snap.exists() || !snap.hasChild("egresos")) {
                         usarDefaults(); return }
 
@@ -117,7 +154,8 @@ class RegistrarFragment : Fragment() {
                         categoriasEgreso.add(n)
                         val subs = mutableListOf<String>()
                         for (ss in cs.child("subcategorias").children) {
-                            val sn = ss.child("nombre").getValue(String::class.java) ?: continue
+                            val sn = ss.child("nombre")
+                                .getValue(String::class.java) ?: continue
                             subs.add(sn)
                             val subsubs = mutableListOf<String>()
                             for (sss in ss.child("subsubcategorias").children)
@@ -133,7 +171,8 @@ class RegistrarFragment : Fragment() {
                         categoriasIngreso.add(n)
                         val subs = mutableListOf<String>()
                         for (ss in cs.child("subcategorias").children) {
-                            val sn = ss.child("nombre").getValue(String::class.java) ?: continue
+                            val sn = ss.child("nombre")
+                                .getValue(String::class.java) ?: continue
                             subs.add(sn)
                             val subsubs = mutableListOf<String>()
                             for (sss in ss.child("subsubcategorias").children)
@@ -147,7 +186,6 @@ class RegistrarFragment : Fragment() {
                     for (c in snap.child("cuentas").children)
                         c.getValue(String::class.java)?.let { cuentas.add(it) }
 
-                    // Garantizar que nunca queden listas vacías
                     if (categoriasEgreso.isEmpty())
                         categoriasEgreso.addAll(listOf("Comida","Casa","Transporte",
                             "Salud","Familia","Ocio","Otro"))
@@ -158,7 +196,6 @@ class RegistrarFragment : Fragment() {
                         cuentas.addAll(listOf("Bancolombia","Nu","Nequi",
                             "Efectivo","Tarjeta crédito"))
 
-                    configCargada = true
                     if (isAdded) {
                         configurarSpinners()
                         actualizarTipo("Egreso")
@@ -170,7 +207,6 @@ class RegistrarFragment : Fragment() {
             })
     }
 
-    // Fallback seguro para cuentas sin configuración (Google nuevo, etc.)
     private fun usarDefaults() {
         if (categoriasEgreso.isEmpty())
             categoriasEgreso.addAll(listOf("Comida","Casa","Transporte",
@@ -181,7 +217,6 @@ class RegistrarFragment : Fragment() {
         if (cuentas.isEmpty())
             cuentas.addAll(listOf("Bancolombia","Nu","Nequi",
                 "Efectivo","Tarjeta crédito"))
-        configCargada = true
         if (isAdded) {
             configurarSpinners()
             actualizarTipo("Egreso")
@@ -209,26 +244,33 @@ class RegistrarFragment : Fragment() {
     }
 
     private fun actualizarBadgeMoneda() {
-        val m = runCatching { spinnerMoneda.selectedItem?.toString() ?: "COP" }.getOrDefault("COP")
+        val m = runCatching {
+            spinnerMoneda.selectedItem?.toString() ?: "COP" }.getOrDefault("COP")
         tvMonedaBadge.text = if (m == "USD") "🇺🇸 USD" else "🇨🇴 COP"
-        tvMonedaBadge.setTextColor(Color.parseColor(if (m == "USD") "#2196F3" else "#4CAF50"))
+        tvMonedaBadge.setTextColor(
+            Color.parseColor(if (m == "USD") "#2196F3" else "#4CAF50"))
     }
 
     private fun actualizarTipo(tipo: String) {
         tipoSeleccionado = tipo
         val rojo  = Color.parseColor("#FF5252"); val verde = Color.parseColor("#4CAF50")
         val azul  = Color.parseColor("#2196F3"); val osc   = Color.parseColor("#0D1A2A")
-        btnEgreso.backgroundTintList   = ColorStateList.valueOf(if (tipo=="Egreso") rojo else osc)
-        btnEgreso.setTextColor(if (tipo=="Egreso") Color.WHITE else rojo)
-        btnIngreso.backgroundTintList  = ColorStateList.valueOf(if (tipo=="Ingreso") verde else osc)
-        btnIngreso.setTextColor(if (tipo=="Ingreso") Color.WHITE else verde)
-        btnTransferencia.backgroundTintList = ColorStateList.valueOf(if (tipo=="Transferencia") azul else osc)
-        btnTransferencia.setTextColor(if (tipo=="Transferencia") Color.WHITE else azul)
+        btnEgreso.backgroundTintList =
+            ColorStateList.valueOf(if (tipo == "Egreso") rojo else osc)
+        btnEgreso.setTextColor(if (tipo == "Egreso") Color.WHITE else rojo)
+        btnIngreso.backgroundTintList =
+            ColorStateList.valueOf(if (tipo == "Ingreso") verde else osc)
+        btnIngreso.setTextColor(if (tipo == "Ingreso") Color.WHITE else verde)
+        btnTransferencia.backgroundTintList =
+            ColorStateList.valueOf(if (tipo == "Transferencia") azul else osc)
+        btnTransferencia.setTextColor(if (tipo == "Transferencia") Color.WHITE else azul)
 
         if (tipo == "Transferencia") {
-            layoutNormal.visibility = View.GONE; layoutTransf.visibility = View.VISIBLE
+            layoutNormal.visibility = View.GONE
+            layoutTransf.visibility = View.VISIBLE
         } else {
-            layoutNormal.visibility = View.VISIBLE; layoutTransf.visibility = View.GONE
+            layoutNormal.visibility = View.VISIBLE
+            layoutTransf.visibility = View.GONE
             val lista = if (tipo == "Egreso") categoriasEgreso else categoriasIngreso
             if (lista.isNotEmpty()) spinnerCat.adapter = spinnerAdapter(lista)
         }
@@ -244,11 +286,11 @@ class RegistrarFragment : Fragment() {
 
     private fun configurarSpinners() {
         if (!isAdded) return
-
-        val catList = if (tipoSeleccionado == "Egreso") categoriasEgreso else categoriasIngreso
+        val catList = if (tipoSeleccionado == "Egreso")
+            categoriasEgreso else categoriasIngreso
         if (catList.isNotEmpty()) spinnerCat.adapter = spinnerAdapter(catList)
-
-        val cl = cuentas.ifEmpty { listOf("Bancolombia","Nu","Nequi","Efectivo","Tarjeta crédito") }
+        val cl = cuentas.ifEmpty {
+            listOf("Bancolombia","Nu","Nequi","Efectivo","Tarjeta crédito") }
         spinnerCuenta.adapter  = spinnerAdapter(cl)
         spinnerMoneda.adapter  = spinnerAdapter(monedas)
         spinnerOrigen.adapter  = spinnerAdapter(cl)
@@ -259,10 +301,10 @@ class RegistrarFragment : Fragment() {
                 actualizarBadgeMoneda() }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
-
         spinnerCat.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                val cat  = runCatching { spinnerCat.selectedItem?.toString() ?: "" }.getOrDefault("")
+                val cat  = runCatching {
+                    spinnerCat.selectedItem?.toString() ?: "" }.getOrDefault("")
                 val subs = subcategoriasMap[cat]
                 ocultarSubSubcat()
                 if (!subs.isNullOrEmpty()) {
@@ -274,10 +316,10 @@ class RegistrarFragment : Fragment() {
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
         }
-
         spinnerSubcat.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                val sub = runCatching { spinnerSubcat.selectedItem?.toString() ?: "" }.getOrDefault("")
+                val sub = runCatching {
+                    spinnerSubcat.selectedItem?.toString() ?: "" }.getOrDefault("")
                 actualizarSubSubcat(sub)
             }
             override fun onNothingSelected(p: AdapterView<*>?) {}
@@ -294,7 +336,8 @@ class RegistrarFragment : Fragment() {
     }
 
     private fun spinnerAdapter(items: List<String>) =
-        ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, items).also {
+        ArrayAdapter(requireContext(),
+            android.R.layout.simple_spinner_item, items).also {
             it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
 
     private fun bajarTeclado() {
@@ -307,20 +350,25 @@ class RegistrarFragment : Fragment() {
     private fun confirmarYGuardar() {
         if (!isAdded) return
         bajarTeclado()
-
         val uid = auth.currentUser?.uid ?: run {
-            Toast.makeText(requireContext(), "Debes iniciar sesión", Toast.LENGTH_SHORT).show()
-            return }
+            Toast.makeText(requireContext(),
+                "Debes iniciar sesión", Toast.LENGTH_SHORT).show(); return }
+
+        val ahora = fechaSeleccionada.timeInMillis
 
         val data = mutableMapOf<String, Any>(
-            "id"              to "",
-            "tipoTransaccion" to tipoSeleccionado,
-            "timestamp"       to System.currentTimeMillis(),
-            "detalle"         to "", "categoria"    to "",
-            "subcategoria"    to "", "subsubcategoria" to "",
-            "cuenta"          to "", "moneda"       to "COP",
-            "cuentaOrigen"    to "", "valor"        to 0.0,
-            "fechaPersonalizada" to System.currentTimeMillis()
+            "id"                 to "",
+            "tipoTransaccion"    to tipoSeleccionado,
+            "timestamp"          to ahora,
+            "fechaPersonalizada" to ahora,
+            "detalle"            to "",
+            "categoria"          to "",
+            "subcategoria"       to "",
+            "subsubcategoria"    to "",
+            "cuenta"             to "",
+            "moneda"             to "COP",
+            "cuentaOrigen"       to "",
+            "valor"              to 0.0
         )
 
         try {
@@ -379,13 +427,15 @@ class RegistrarFragment : Fragment() {
         val det    = data["detalle"] as String
         val cuenta = data["cuenta"] as String
         val origen = data["cuentaOrigen"] as String
+        val sdf    = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
+        val fechaStr = sdf.format(Date(fechaSeleccionada.timeInMillis))
 
         val colorTipo = when (tipo) {
-            "Ingreso"       -> "#69F0AE"; "Transferencia" -> "#2196F3"; else -> "#FF5252" }
+            "Ingreso" -> "#69F0AE"; "Transferencia" -> "#2196F3"; else -> "#FF5252" }
         val emoji = when (tipo) {
             "Ingreso" -> "📈"; "Transferencia" -> "🔄"; else -> "📉" }
+        val ctx = requireContext()
 
-        val ctx  = requireContext()
         val raiz = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#111E2E"))
@@ -410,12 +460,7 @@ class RegistrarFragment : Fragment() {
             (layoutParams as android.widget.LinearLayout.LayoutParams)
                 .setMargins(0,0,0,dp(16)) })
 
-        raiz.addView(View(ctx).apply {
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
-                setMargins(0,0,0,dp(12)) }
-            setBackgroundColor(Color.parseColor("#1E3A4A"))
-        })
+        raiz.addView(lineaDivisor(ctx))
 
         fun fila(label: String, valor2: String, clr: String = "#EEFFEE") {
             if (valor2.isEmpty()) return
@@ -439,8 +484,10 @@ class RegistrarFragment : Fragment() {
             raiz.addView(row)
         }
 
+        fila("📅 Fecha", fechaStr, "#AABBCC")
         if (tipo == "Transferencia") {
-            fila("Origen", origen, "#2196F3"); fila("Destino", cuenta, "#00BCD4")
+            fila("Origen",  origen, "#2196F3")
+            fila("Destino", cuenta, "#00BCD4")
         } else {
             if (cat.isNotEmpty()) fila("Categoría", cat)
             fila("Cuenta", cuenta)
@@ -448,12 +495,9 @@ class RegistrarFragment : Fragment() {
         if (det.isNotEmpty()) fila("Detalle", det)
         fila("Moneda", moneda, if (moneda == "USD") "#2196F3" else "#4CAF50")
 
-        raiz.addView(View(ctx).apply {
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
-                setMargins(0,dp(8),0,dp(16)) }
-            setBackgroundColor(Color.parseColor("#1E3A4A"))
-        })
+        raiz.addView(lineaDivisor(ctx).apply {
+            (layoutParams as android.widget.LinearLayout.LayoutParams)
+                .setMargins(0,dp(8),0,dp(16)) })
 
         val filaBtns = android.widget.LinearLayout(ctx).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
@@ -491,6 +535,14 @@ class RegistrarFragment : Fragment() {
             it.setLayout(w, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT) }
     }
 
+    private fun lineaDivisor(ctx: android.content.Context) =
+        View(ctx).apply {
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1).apply {
+                setMargins(0,0,0,dp(12)) }
+            setBackgroundColor(Color.parseColor("#1E3A4A"))
+        }
+
     private fun guardarEnFirebase(uid: String, data: MutableMap<String, Any>) {
         val ref = db.child("movimientos").child(uid).push()
         data["id"] = ref.key ?: ""
@@ -500,6 +552,9 @@ class RegistrarFragment : Fragment() {
                 if (!isAdded) return@addOnSuccessListener
                 Toast.makeText(requireContext(), "✅ Guardado", Toast.LENGTH_SHORT).show()
                 limpiar()
+                // Resetear fecha a hoy
+                fechaSeleccionada = Calendar.getInstance()
+                actualizarTextoFecha()
                 btnGuardar.isEnabled = true; btnGuardar.text = "GUARDAR MOVIMIENTO"
             }
             .addOnFailureListener { e ->
