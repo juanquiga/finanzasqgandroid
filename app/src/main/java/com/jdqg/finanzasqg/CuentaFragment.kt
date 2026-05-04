@@ -55,12 +55,19 @@ class CuentaFragment : Fragment() {
 
         view.findViewById<View>(R.id.filaCambiarContrasena).setOnClickListener {
             auth.sendPasswordResetEmail(user?.email ?: "").addOnSuccessListener {
-                Toast.makeText(requireContext(), "Correo enviado ✅", Toast.LENGTH_LONG).show()
+                Toast.makeText(requireContext(),
+                    "Correo enviado ✅", Toast.LENGTH_LONG).show()
             }
         }
 
+        // Modificar categorías — va a SetupCategoriasActivity
         view.findViewById<View>(R.id.filaModificarRegistros).setOnClickListener {
             startActivity(Intent(requireActivity(), SetupCategoriasActivity::class.java))
+        }
+
+        // Presupuesto — va a PresupuestoActivity (nueva, separada)
+        view.findViewById<View>(R.id.filaPresupuesto).setOnClickListener {
+            startActivity(Intent(requireActivity(), PresupuestoActivity::class.java))
         }
 
         view.findViewById<View>(R.id.filaContacto).setOnClickListener {
@@ -113,7 +120,8 @@ class CuentaFragment : Fragment() {
             if (n.isEmpty()) { etNombre.error = "Campo requerido"; return@setOnClickListener }
             db.child("users").child(uid).child("name").setValue(n).addOnSuccessListener {
                 tvNombre.text = n
-                Toast.makeText(requireContext(), "✅ Nombre actualizado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(),
+                    "✅ Nombre actualizado", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
             }
         }
@@ -133,13 +141,12 @@ class CuentaFragment : Fragment() {
                 ViewGroup.LayoutParams.WRAP_CONTENT)
         }
         vista.findViewById<Button>(R.id.btnConfirmarCerrar).setOnClickListener {
-            requireActivity().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .edit().clear().apply()
+            requireActivity()
+                .getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
             auth.signOut()
             requireActivity().startActivity(
                 Intent(requireActivity(), Login::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                })
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK })
             requireActivity().finish()
         }
         vista.findViewById<Button>(R.id.btnCancelarCerrar)

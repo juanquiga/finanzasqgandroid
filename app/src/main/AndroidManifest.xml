@@ -22,24 +22,21 @@
         <activity android:name=".SignUp"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
-
         <activity android:name=".MainActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
-
         <activity android:name=".OnboardingActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
-
-        <!-- configChanges evita que se destruya y recree al rotar -->
         <activity android:name=".SetupCategoriasActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
-
+        <activity android:name=".PresupuestoActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
         <activity android:name=".DetalleMovimientoActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
-
         <activity android:name=".HistorialActivity"
             android:exported="false"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
