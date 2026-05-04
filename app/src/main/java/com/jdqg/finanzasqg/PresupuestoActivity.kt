@@ -14,17 +14,15 @@ import com.google.firebase.database.*
 import java.text.NumberFormat
 import java.util.Locale
 
-// Modelos de presupuesto — independientes, sin claves compuestas
 data class SubsubPresupuesto(
     var nombre: String = "",
     var presupuesto: Double = 0.0
 )
 data class SubPresupuesto(
     var nombre: String = "",
-    var presupuesto: Double = 0.0,          // presupuesto propio de la sub
+    var presupuesto: Double = 0.0,
     val subsubcategorias: MutableList<SubsubPresupuesto> = mutableListOf()
 ) {
-    // Total = presupuesto propio + suma de subsubcategorías
     val presupuestoTotal: Double get() =
         if (subsubcategorias.isEmpty()) presupuesto
         else subsubcategorias.sumOf { it.presupuesto }.let {
@@ -33,10 +31,9 @@ data class SubPresupuesto(
 }
 data class CatPresupuesto(
     var nombre: String = "",
-    var presupuesto: Double = 0.0,          // presupuesto propio de la categoría
+    var presupuesto: Double = 0.0,
     val subcategorias: MutableList<SubPresupuesto> = mutableListOf()
 ) {
-    // Total = suma de subcategorías (si las hay) o presupuesto propio
     val presupuestoTotal: Double get() =
         if (subcategorias.isEmpty()) presupuesto
         else subcategorias.sumOf { it.presupuestoTotal }.let {
@@ -53,7 +50,6 @@ class PresupuestoActivity : AppCompatActivity() {
     private var presupuestoMaxUSD = 0.0
     private val categorias = mutableListOf<CatPresupuesto>()
 
-    // Control de expansión
     private var catExpandida = ""
     private var subExpandida = ""
 
@@ -61,9 +57,12 @@ class PresupuestoActivity : AppCompatActivity() {
     private lateinit var btnGuardar : Button
     private lateinit var tvTotalGen : TextView
 
-    // Referencias de TextViews de totales para actualizar sin re-render
     private val tvTotCat = mutableMapOf<String, TextView>()
     private val tvTotSub = mutableMapOf<String, TextView>()
+
+    // Referencias al campo general para actualizar automáticamente
+    private var etPresupGenCOP: EditText? = null
+    private var etPresupGenUSD: EditText? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,7 +72,7 @@ class PresupuestoActivity : AppCompatActivity() {
         btnGuardar = findViewById(R.id.btnGuardarPresupuesto)
         tvTotalGen = findViewById(R.id.tvTotalGeneralPresupuesto)
 
-        findViewById<android.widget.ImageButton>(R.id.btnVolverPresupuesto)
+        findViewById<ImageButton>(R.id.btnVolverPresupuesto)
             .setOnClickListener { finish() }
 
         btnGuardar.setOnClickListener { guardar() }
@@ -91,18 +90,15 @@ class PresupuestoActivity : AppCompatActivity() {
                     presupuestoMaxUSD = snap.child("presupuestoMax")
                         .child("max_USD").getValue(Double::class.java) ?: 0.0
 
-                    // Cargar árbol de egresos con sus presupuestos
                     categorias.clear()
                     for (cs in snap.child("egresos").children) {
                         val catNombre = cs.child("nombre")
                             .getValue(String::class.java) ?: continue
                         val cat = CatPresupuesto(catNombre)
-
                         for (ss in cs.child("subcategorias").children) {
                             val subNombre = ss.child("nombre")
                                 .getValue(String::class.java) ?: continue
                             val sub = SubPresupuesto(subNombre)
-
                             for (sss in ss.child("subsubcategorias").children) {
                                 val ssNombre = sss.getValue(String::class.java) ?: continue
                                 sub.subsubcategorias.add(SubsubPresupuesto(ssNombre))
@@ -112,35 +108,27 @@ class PresupuestoActivity : AppCompatActivity() {
                         categorias.add(cat)
                     }
 
-                    // Cargar presupuestos guardados desde Firebase
+                    // Cargar presupuestos guardados
                     val snapP = if (snap.child("presupuestoCategorias").exists())
                         snap.child("presupuestoCategorias")
                     else snap.child("maximosCategorias")
 
                     for (s in snapP.children) {
                         val clave = s.key ?: continue
-                        val val_  = s.child("max_COP").getValue(Double::class.java) ?: 0.0
+                        val val_ = s.child("max_COP")
+                            .getValue(Double::class.java) ?: 0.0
 
                         val partes = clave.split(" > ")
                         when (partes.size) {
-                            1 -> {
-                                // Es una categoría
-                                categorias.find { it.nombre == partes[0] }
-                                    ?.presupuesto = val_
-                            }
-                            2 -> {
-                                // Es una subcategoría
-                                categorias.find { it.nombre == partes[0] }
-                                    ?.subcategorias?.find { it.nombre == partes[1] }
-                                    ?.presupuesto = val_
-                            }
-                            3 -> {
-                                // Es una subsubcategoría
-                                categorias.find { it.nombre == partes[0] }
-                                    ?.subcategorias?.find { it.nombre == partes[1] }
-                                    ?.subsubcategorias?.find { it.nombre == partes[2] }
-                                    ?.presupuesto = val_
-                            }
+                            1 -> categorias.find { it.nombre == partes[0] }
+                                ?.presupuesto = val_
+                            2 -> categorias.find { it.nombre == partes[0] }
+                                ?.subcategorias?.find { it.nombre == partes[1] }
+                                ?.presupuesto = val_
+                            3 -> categorias.find { it.nombre == partes[0] }
+                                ?.subcategorias?.find { it.nombre == partes[1] }
+                                ?.subsubcategorias?.find { it.nombre == partes[2] }
+                                ?.presupuesto = val_
                         }
                     }
 
@@ -152,48 +140,88 @@ class PresupuestoActivity : AppCompatActivity() {
 
     private fun totalGeneral(): Double = categorias.sumOf { it.presupuestoTotal }
 
+    // ── FIX PRINCIPAL: actualiza totales SIN re-renderizar ni perder cursor ────
     private fun actualizarTotalesEnPantalla() {
         val total = totalGeneral()
+
+        // Actualizar texto del header
         tvTotalGen.text = if (total > 0) "Total presupuestado: ${fmt(total)}" else ""
 
+        // Actualizar totales de categorías y subcategorías
         categorias.forEach { cat ->
-            tvTotCat[cat.nombre]?.text = if (cat.presupuestoTotal > 0)
-                fmt(cat.presupuestoTotal) else ""
+            tvTotCat[cat.nombre]?.text =
+                if (cat.presupuestoTotal > 0) fmt(cat.presupuestoTotal) else ""
             cat.subcategorias.forEach { sub ->
                 tvTotSub["${cat.nombre}|${sub.nombre}"]?.text =
                     if (sub.presupuestoTotal > 0) fmt(sub.presupuestoTotal) else ""
             }
         }
+
+        // ── ACTUALIZAR CAMPO GENERAL AUTOMÁTICAMENTE ──
+        // Si presupuestoMaxCOP == 0 (sin valor manual), se muestra el total calculado
+        // como hint y se sincroniza el valor interno, SIN llamar setText()
+        if (presupuestoMaxCOP <= 0 && total > 0) {
+            presupuestoMaxCOP = total   // sincronizar valor interno
+            etPresupGenCOP?.hint = "Auto: ${fmt(total)}"
+        } else if (presupuestoMaxCOP <= 0 && total == 0.0) {
+            etPresupGenCOP?.hint = "0 COP"
+        }
     }
 
     private fun renderizar() {
         tvTotCat.clear(); tvTotSub.clear()
+        etPresupGenCOP = null; etPresupGenUSD = null
         container.removeAllViews()
 
-        // ── Banner info ────────────────────────────────────────────────────────
+        // Banner info
         container.addView(bannerInfo())
 
-        // ── Total general ──────────────────────────────────────────────────────
-        val total = totalGeneral()
-        tvTotalGen.text = if (total > 0) "Total presupuestado: ${fmt(total)}" else ""
-
-        // ── Presupuesto general ────────────────────────────────────────────────
+        // Presupuesto general
         val cardGen = card()
         cardGen.addView(seccionHeader("💳  Presupuesto general mensual"))
         cardGen.addView(tvHint("Máximo total que quieres gastar al mes"))
 
         cardGen.addView(tvLabel("COP  ($)"))
-        cardGen.addView(etLibre(
-            presupuestoMaxCOP, "0 COP"
-        ) { presupuestoMaxCOP = it })
+        val totalAuto = totalGeneral()
+        val etCOP = etLibre(
+            if (presupuestoMaxCOP > 0) presupuestoMaxCOP else 0.0,
+            if (totalAuto > 0) "Auto: ${fmt(totalAuto)}" else "0 COP"
+        ) { v ->
+            presupuestoMaxCOP = v
+            // Si borra el valor, volver al automático
+            if (v <= 0) {
+                presupuestoMaxCOP = totalGeneral()
+                etPresupGenCOP?.hint = if (totalGeneral() > 0)
+                    "Auto: ${fmt(totalGeneral())}" else "0 COP"
+            }
+        }
+        etPresupGenCOP = etCOP
+        cardGen.addView(etCOP)
 
         cardGen.addView(tvLabel("USD"))
-        cardGen.addView(etLibre(
+        val etUSD = etLibre(
             presupuestoMaxUSD, "0 USD", decimal = true
-        ) { presupuestoMaxUSD = it })
+        ) { v -> presupuestoMaxUSD = v }
+        etPresupGenUSD = etUSD
+        cardGen.addView(etUSD)
+
+        // Mostrar total calculado si hay valores
+        if (totalAuto > 0) {
+            cardGen.addView(TextView(this).apply {
+                text = "✅ Total calculado: ${fmt(totalAuto)}"
+                setTextColor(Color.parseColor("#4CAF50"))
+                textSize = 13f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    setMargins(0, dpToPx(6), 0, 0)
+                }
+            })
+        }
         container.addView(cardGen)
 
-        // ── Presupuesto jerárquico ─────────────────────────────────────────────
+        // Presupuesto jerárquico
         val cardCats = card()
         cardCats.addView(seccionHeader("🎯  Presupuesto por categoría"))
         cardCats.addView(tvHint("Toca una categoría para expandirla y configurar sus subcategorías"))
@@ -201,7 +229,6 @@ class PresupuestoActivity : AppCompatActivity() {
         categorias.forEach { cat ->
             val esExpandida = catExpandida == cat.nombre
 
-            // Fila categoría — tappable
             val tvTot = TextView(this).apply {
                 text = if (cat.presupuestoTotal > 0) fmt(cat.presupuestoTotal) else ""
                 setTextColor(Color.parseColor("#4CAF50"))
@@ -213,12 +240,11 @@ class PresupuestoActivity : AppCompatActivity() {
             val filaCat = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                setBackgroundColor(Color.parseColor("#0D1A2A"))
-                setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12))
                 background = android.graphics.drawable.GradientDrawable().apply {
                     setColor(Color.parseColor("#0D1A2A"))
                     cornerRadius = dpToPx(10).toFloat()
                 }
+                setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -226,22 +252,19 @@ class PresupuestoActivity : AppCompatActivity() {
                 }
             }
 
-            // Chevron
             filaCat.addView(TextView(this).apply {
                 text = if (esExpandida) "▼" else "▶"
                 setTextColor(Color.parseColor("#4CAF50")); textSize = 11f
-                layoutParams = LinearLayout.LayoutParams(
-                    dpToPx(20), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                layoutParams = LinearLayout.LayoutParams(dpToPx(20),
+                    LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                     gravity = android.view.Gravity.CENTER_VERTICAL }
             })
-            // Emoji folder
             filaCat.addView(TextView(this).apply {
                 text = "📂"; textSize = 16f
-                layoutParams = LinearLayout.LayoutParams(
-                    dpToPx(28), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    setMargins(0,0,dpToPx(6),0) }
+                layoutParams = LinearLayout.LayoutParams(dpToPx(28),
+                    LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    setMargins(0, 0, dpToPx(6), 0) }
             })
-            // Nombre
             filaCat.addView(TextView(this).apply {
                 text = cat.nombre
                 setTextColor(Color.WHITE); textSize = 14f
@@ -249,7 +272,6 @@ class PresupuestoActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
-            // Total
             filaCat.addView(tvTot)
 
             filaCat.setOnClickListener {
@@ -270,7 +292,6 @@ class PresupuestoActivity : AppCompatActivity() {
                     }
                 }
 
-                // Campo presupuesto propio de categoría
                 bloqueExpandido.addView(campoInline(
                     "Presupuesto propio de \"${cat.nombre}\"",
                     cat.presupuesto
@@ -290,7 +311,6 @@ class PresupuestoActivity : AppCompatActivity() {
                     }
                     tvTotSub["${cat.nombre}|${sub.nombre}"] = tvTotS
 
-                    // Fila subcategoría
                     val filaSub = LinearLayout(this).apply {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = android.view.Gravity.CENTER_VERTICAL
@@ -319,7 +339,7 @@ class PresupuestoActivity : AppCompatActivity() {
                         text = "📁"; textSize = 13f
                         layoutParams = LinearLayout.LayoutParams(dpToPx(22),
                             LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                            setMargins(0,0,dpToPx(4),0) }
+                            setMargins(0, 0, dpToPx(4), 0) }
                     })
                     filaSub.addView(TextView(this).apply {
                         text = sub.nombre
@@ -345,7 +365,6 @@ class PresupuestoActivity : AppCompatActivity() {
                                 LinearLayout.LayoutParams.WRAP_CONTENT)
                         }
 
-                        // Campo presupuesto propio de subcategoría
                         bloqueSub.addView(campoInline(
                             "Presupuesto de \"${sub.nombre}\"",
                             sub.presupuesto
@@ -354,7 +373,6 @@ class PresupuestoActivity : AppCompatActivity() {
                             actualizarTotalesEnPantalla()
                         })
 
-                        // Subsubcategorías
                         if (sub.subsubcategorias.isNotEmpty()) {
                             bloqueSub.addView(TextView(this).apply {
                                 text = "Subsubcategorías:"
@@ -402,7 +420,7 @@ class PresupuestoActivity : AppCompatActivity() {
                                     text = "📌"; textSize = 12f
                                     layoutParams = LinearLayout.LayoutParams(dpToPx(22),
                                         LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                                        setMargins(0,0,dpToPx(4),0) }
+                                        setMargins(0, 0, dpToPx(4), 0) }
                                 })
                                 filaSSub.addView(TextView(this).apply {
                                     text = ssub.nombre
@@ -411,7 +429,7 @@ class PresupuestoActivity : AppCompatActivity() {
                                     layoutParams = LinearLayout.LayoutParams(0,
                                         LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                                 })
-                                // Campo de presupuesto — SIN renderizar(), nunca pierde cursor
+                                // Campo sin renderizar() — nunca pierde cursor
                                 filaSSub.addView(etSubsubLibre(ssub.presupuesto) { v ->
                                     ssub.presupuesto = v
                                     actualizarTotalesEnPantalla()
@@ -422,7 +440,7 @@ class PresupuestoActivity : AppCompatActivity() {
                                     layoutParams = LinearLayout.LayoutParams(
                                         LinearLayout.LayoutParams.WRAP_CONTENT,
                                         LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                                        setMargins(dpToPx(4),0,0,0) }
+                                        setMargins(dpToPx(4), 0, 0, 0) }
                                 })
                                 cardSubsub.addView(filaSSub)
                             }
@@ -442,53 +460,57 @@ class PresupuestoActivity : AppCompatActivity() {
         val uid = auth.currentUser?.uid ?: run {
             btnGuardar.isEnabled = true; btnGuardar.text = "GUARDAR PRESUPUESTO"; return }
 
-        // Calcular presupuesto general = suma de categorías si no hay valor manual
+        // Presupuesto general = manual o suma automática
         val genCOP = if (presupuestoMaxCOP > 0) presupuestoMaxCOP
         else totalGeneral()
-        val genUSD = if (presupuestoMaxUSD > 0) presupuestoMaxUSD else 0.0
+        val genUSD = presupuestoMaxUSD
 
-        // Serializar — una clave por nivel, sin claves compuestas duplicadas
         val presupMap = mutableMapOf<String, Any>()
         categorias.forEach { cat ->
             if (cat.presupuesto > 0)
-                presupMap[cat.nombre] = mapOf(
-                    "max_COP" to cat.presupuesto, "max_USD" to 0.0)
-            // Total automático de la categoría
+                presupMap[cat.nombre] = mapOf("max_COP" to cat.presupuesto, "max_USD" to 0.0)
+
             val totCat = cat.presupuestoTotal
-            if (totCat > 0 && totCat != cat.presupuesto)
-                presupMap["${cat.nombre}__total"] = mapOf(
-                    "max_COP" to totCat, "max_USD" to 0.0)
+            if (totCat > 0)
+                presupMap["${cat.nombre}__total"] = mapOf("max_COP" to totCat, "max_USD" to 0.0)
 
             cat.subcategorias.forEach { sub ->
                 if (sub.presupuesto > 0)
-                    presupMap["${cat.nombre} > ${sub.nombre}"] = mapOf(
-                        "max_COP" to sub.presupuesto, "max_USD" to 0.0)
+                    presupMap["${cat.nombre} > ${sub.nombre}"] =
+                        mapOf("max_COP" to sub.presupuesto, "max_USD" to 0.0)
                 val totSub = sub.presupuestoTotal
                 if (totSub > 0)
-                    presupMap["${cat.nombre} > ${sub.nombre}__total"] = mapOf(
-                        "max_COP" to totSub, "max_USD" to 0.0)
+                    presupMap["${cat.nombre} > ${sub.nombre}__total"] =
+                        mapOf("max_COP" to totSub, "max_USD" to 0.0)
 
                 sub.subsubcategorias.forEach { ssub ->
                     if (ssub.presupuesto > 0)
-                        presupMap["${cat.nombre} > ${sub.nombre} > ${ssub.nombre}"] = mapOf(
-                            "max_COP" to ssub.presupuesto, "max_USD" to 0.0)
+                        presupMap["${cat.nombre} > ${sub.nombre} > ${ssub.nombre}"] =
+                            mapOf("max_COP" to ssub.presupuesto, "max_USD" to 0.0)
                 }
             }
         }
 
-        // Guardar todo
-        val uid2 = uid
-        db.child("configuracion").child(uid2).child("presupuestoMax")
+        db.child("configuracion").child(uid).child("presupuestoMax")
             .setValue(mapOf("max_COP" to genCOP, "max_USD" to genUSD))
 
-        db.child("configuracion").child(uid2).child("presupuestoCategorias")
+        db.child("configuracion").child(uid).child("presupuestoCategorias")
             .setValue(presupMap)
-        db.child("configuracion").child(uid2).child("maximosCategorias")
+        db.child("configuracion").child(uid).child("maximosCategorias")
             .setValue(presupMap)
             .addOnSuccessListener {
                 btnGuardar.isEnabled = true; btnGuardar.text = "GUARDAR PRESUPUESTO"
                 Toast.makeText(this, "✅ Presupuesto guardado", Toast.LENGTH_SHORT).show()
-                finish()
+
+                // Si viene del onboarding, ir a la app principal
+                val desdeOnboarding = intent.getBooleanExtra("desde_onboarding", false)
+                if (desdeOnboarding) {
+                    startActivity(Intent(this, MainActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    })
+                } else {
+                    finish()
+                }
             }
             .addOnFailureListener {
                 btnGuardar.isEnabled = true; btnGuardar.text = "GUARDAR PRESUPUESTO"
@@ -496,14 +518,12 @@ class PresupuestoActivity : AppCompatActivity() {
             }
     }
 
-    // ── Campo numérico para subsubcategorías — nunca pierde cursor ─────────────
     private fun etSubsubLibre(valorInicial: Double, onChange: (Double) -> Unit) =
         EditText(this).apply {
             if (valorInicial > 0) setText(valorInicial.toLong().toString())
             hint = "0"
             setHintTextColor(Color.parseColor("#2A4A5A"))
-            setTextColor(Color.WHITE)
-            textSize = 13f
+            setTextColor(Color.WHITE); textSize = 13f
             inputType = InputType.TYPE_CLASS_NUMBER
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(Color.parseColor("#0D1A2A"))
@@ -514,11 +534,10 @@ class PresupuestoActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(dpToPx(90),
                 LinearLayout.LayoutParams.WRAP_CONTENT)
             gravity = android.view.Gravity.END
-
             addTextChangedListener(object : TextWatcher {
                 override fun afterTextChanged(s: Editable?) {
                     val raw = s?.toString()?.trim() ?: ""
-                    onChange(raw.replace(".","").replace(",","")
+                    onChange(raw.replace(".", "").replace(",", "")
                         .toLongOrNull()?.toDouble() ?: 0.0)
                 }
                 override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
@@ -526,14 +545,13 @@ class PresupuestoActivity : AppCompatActivity() {
             })
         }
 
-    // ── Campo inline para categoría/subcategoría ───────────────────────────────
     private fun campoInline(label: String, valorInicial: Double,
                             onChange: (Double) -> Unit): LinearLayout {
         val fila = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
             background = android.graphics.drawable.GradientDrawable().apply {
-                setColor(Color.parseColor("#0D1A2A").and(0x80FFFFFF.toInt()))
+                setColor(Color.parseColor("#0A1218"))
                 cornerRadius = dpToPx(8).toFloat()
             }
             setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8))
@@ -559,12 +577,11 @@ class PresupuestoActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(dpToPx(4),0,0,0) }
+                setMargins(dpToPx(4), 0, 0, 0) }
         })
         return fila
     }
 
-    // ── Banner info ─────────────────────────────────────────────────────────────
     private fun bannerInfo() = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = android.view.Gravity.CENTER_VERTICAL
@@ -602,7 +619,6 @@ class PresupuestoActivity : AppCompatActivity() {
         addView(col)
     }
 
-    // ── Helpers UI ─────────────────────────────────────────────────────────────
     private fun etLibre(
         valorInicial: Double, hintText: String,
         decimal: Boolean = false,
@@ -626,7 +642,7 @@ class PresupuestoActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {
                 val raw = s?.toString()?.trim() ?: ""
                 val v = if (decimal) raw.toDoubleOrNull() ?: 0.0
-                else raw.replace(".","").replace(",","")
+                else raw.replace(".", "").replace(",", "")
                     .toLongOrNull()?.toDouble() ?: 0.0
                 onChange(v)
             }

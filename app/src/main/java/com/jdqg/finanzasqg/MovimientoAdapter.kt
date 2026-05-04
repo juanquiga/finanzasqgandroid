@@ -3,12 +3,8 @@ package com.jdqg.finanzasqg
 import android.content.Intent
 import android.graphics.Color
 import android.view.*
-import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.FirebaseDatabase
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -17,9 +13,7 @@ class MovimientoAdapter(
     private val lista: MutableList<Movimiento>
 ) : RecyclerView.Adapter<MovimientoAdapter.VH>() {
 
-    private val db   = FirebaseDatabase.getInstance().reference
-    private val auth = FirebaseAuth.getInstance()
-    private val sdf  = SimpleDateFormat("dd/MM/yyyy  HH:mm", Locale.getDefault())
+    private val sdf = SimpleDateFormat("dd/MM/yyyy  HH:mm", Locale.getDefault())
 
     class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvTipo     : TextView = v.findViewById(R.id.tvTipoIndicador)
@@ -27,7 +21,6 @@ class MovimientoAdapter(
         val tvDetalle  : TextView = v.findViewById(R.id.tvDetalle)
         val tvFecha    : TextView = v.findViewById(R.id.tvFecha)
         val tvValor    : TextView = v.findViewById(R.id.tvValor)
-        val btnEliminar: Button   = v.findViewById(R.id.btnEliminarMovimiento)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, vt: Int): VH {
@@ -47,10 +40,9 @@ class MovimientoAdapter(
             else R.drawable.finanzas_badge_egreso)
 
         holder.tvCategoria.text = m.categoria.ifEmpty { m.tipoTransaccion }
-        holder.tvDetalle.text   = m.detalle.ifEmpty {
+        holder.tvDetalle.text = m.detalle.ifEmpty {
             if (esTransf) "${m.cuentaOrigen} → ${m.cuenta}" else "" }
 
-        // Usar fechaPersonalizada si existe, sino timestamp
         val fechaMs = if (m.fechaPersonalizada > 0) m.fechaPersonalizada else m.timestamp
         holder.tvFecha.text = if (fechaMs > 0) sdf.format(Date(fechaMs))
         else m.fechaTransaccion
@@ -59,12 +51,15 @@ class MovimientoAdapter(
         holder.tvValor.setTextColor(Color.parseColor(when {
             esIngreso -> "#69F0AE"; esTransf -> "#2196F3"; else -> "#FF5252" }))
 
+        // Click → abrir detalle con opción de borrar
         holder.itemView.setOnClickListener {
             val ctx = holder.itemView.context
             ctx.startActivity(Intent(ctx, DetalleMovimientoActivity::class.java).apply {
+                putExtra("id",           m.id)
                 putExtra("tipo",         m.tipoTransaccion)
                 putExtra("categoria",    m.categoria)
                 putExtra("subcategoria", m.subcategoria)
+                putExtra("subsubcategoria", m.subsubcategoria)
                 putExtra("detalle",      m.detalle)
                 putExtra("valor",        m.valor)
                 putExtra("timestamp",    fechaMs)
@@ -73,102 +68,9 @@ class MovimientoAdapter(
                 putExtra("cuentaOrigen", m.cuentaOrigen)
             })
         }
-
-        holder.btnEliminar.setOnClickListener {
-            mostrarDialogoEliminar(holder.itemView.context, m)
-        }
-    }
-
-    private fun mostrarDialogoEliminar(ctx: android.content.Context, m: Movimiento) {
-        val tipo  = m.tipoTransaccion
-        val emoji = when (tipo) { "Ingreso" -> "📈"; "Transferencia" -> "🔄"; else -> "📉" }
-        val color = when (tipo) { "Ingreso" -> "#69F0AE"; "Transferencia" -> "#2196F3"; else -> "#FF5252" }
-
-        val raiz = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#111E2E"))
-            setPadding(dp(ctx,24), dp(ctx,24), dp(ctx,24), dp(ctx,20))
-        }
-        raiz.addView(TextView(ctx).apply {
-            text = "🗑️"; textSize = 36f; gravity = android.view.Gravity.CENTER
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,8)) }
-        })
-        raiz.addView(TextView(ctx).apply {
-            text = "Eliminar registro"; textSize = 18f; gravity = android.view.Gravity.CENTER
-            setTextColor(Color.parseColor("#FF5252"))
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,4)) }
-        })
-        raiz.addView(TextView(ctx).apply {
-            text = "$emoji  $tipo  •  ${fmt(m.valor, m.moneda)}"
-            textSize = 15f; gravity = android.view.Gravity.CENTER
-            setTextColor(Color.parseColor(color))
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,6)) }
-        })
-        raiz.addView(TextView(ctx).apply {
-            text = "Esta acción no se puede deshacer"
-            textSize = 12f; gravity = android.view.Gravity.CENTER
-            setTextColor(Color.parseColor("#445566"))
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0,0,0,dp(ctx,16)) }
-        })
-        raiz.addView(View(ctx).apply {
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 1).apply { setMargins(0,0,0,dp(ctx,16)) }
-            setBackgroundColor(Color.parseColor("#1E3A4A"))
-        })
-
-        val filaBtns = android.widget.LinearLayout(ctx).apply {
-            orientation = android.widget.LinearLayout.HORIZONTAL
-            layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT) }
-
-        val dialog = AlertDialog.Builder(ctx).setView(raiz).create()
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-
-        filaBtns.addView(Button(ctx).apply {
-            text = "Cancelar"; isAllCaps = false; textSize = 14f
-            setTextColor(Color.parseColor("#445566"))
-            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#0D1A2A"))
-            layoutParams = android.widget.LinearLayout.LayoutParams(0,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(0,0,dp(ctx,8),0) }
-            setOnClickListener { dialog.dismiss() }
-        })
-        filaBtns.addView(Button(ctx).apply {
-            text = "🗑 Eliminar"; isAllCaps = false; textSize = 14f; setTextColor(Color.WHITE)
-            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C62828"))
-            layoutParams = android.widget.LinearLayout.LayoutParams(0,
-                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setOnClickListener {
-                dialog.dismiss()
-                val uid = auth.currentUser?.uid ?: return@setOnClickListener
-                if (m.id.isEmpty()) return@setOnClickListener
-                db.child("movimientos").child(uid).child(m.id).removeValue()
-                    .addOnSuccessListener {
-                        val pos = lista.indexOfFirst { it.id == m.id }
-                        if (pos >= 0) { lista.removeAt(pos); notifyItemRemoved(pos) }
-                    }
-            }
-        })
-        raiz.addView(filaBtns)
-        dialog.show()
-        dialog.window?.let {
-            val w = (ctx.resources.displayMetrics.widthPixels * 0.85).toInt()
-            it.setLayout(w, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT) }
     }
 
     override fun getItemCount() = lista.size
-
-    private fun dp(ctx: android.content.Context, dp: Int) =
-        (dp * ctx.resources.displayMetrics.density).toInt()
 
     private fun fmt(valor: Double, moneda: String): String {
         return if (moneda == "USD") {
